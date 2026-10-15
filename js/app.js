@@ -3,7 +3,7 @@
   "use strict";
 
   const UI = root.UI, PF = root.PF, D = root.PF_DATA, Store = PF.Store, h = UI.h, $ = UI.$, $$ = UI.$$;
-  UI.VERSION = "1.1.0";
+  UI.VERSION = "1.1.1";
 
   const ancho = () => matchMedia("(min-width: 900px)").matches;
 
@@ -279,7 +279,8 @@
       const archivo = new File([bytes], nombre, { type: "application/pdf" });
       try {
         if (navigator.canShare && navigator.canShare({ files: [archivo] })) {
-          await navigator.share({ files: [archivo], title: nombre.replace(/\.pdf$/, "").replace(/_/g, " ") });
+          UI.compartiendo = true;
+          try { await navigator.share({ files: [archivo], title: nombre.replace(/\.pdf$/, "").replace(/_/g, " ") }); } finally { UI.compartiendo = false; }
           return;
         }
       } catch (err) {
@@ -392,13 +393,35 @@
 
     navigator.serviceWorker.register("sw.js").then((reg) => {
       UI.reg = reg;
-      const avisar = () => { UI.hayActualizacion = true; UI.render(true); UI.aviso("Hay una versión nueva", { accion: "Actualizar", alAccion: aplicarActualizacion, ms: 9000 }); };
+      // Actualiza sola apenas es seguro (sin editar un campo, sin hojas abiertas ni PDF en curso).
+      // Si no es seguro, muestra el aviso y reintenta cada pocos segundos.
+      const seguro = () => {
+        const a = document.activeElement;
+        const escribiendo = a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);
+        return !escribiendo && !document.querySelector("#capa .fondo") && !UI.compartiendo;
+      };
+      let reintento = null;
+      const intentar = () => {
+        if (!reg.waiting) { clearInterval(reintento); reintento = null; return; }
+        if (seguro()) {
+          clearInterval(reintento); reintento = null;
+          try { Store.guardarYa(); } catch (e) { /* nada */ }
+          UI.aviso("Actualizando PlanFit…");
+          setTimeout(aplicarActualizacion, 350);
+        }
+      };
+      const avisar = () => {
+        UI.hayActualizacion = true;
+        intentar();
+        if (reg.waiting && !reintento) { UI.render(true); reintento = setInterval(intentar, 4000); }
+      };
       if (reg.waiting && navigator.serviceWorker.controller) avisar();
       reg.addEventListener("updatefound", () => {
         const nuevo = reg.installing;
         if (!nuevo) return;
         nuevo.addEventListener("statechange", () => { if (nuevo.state === "installed" && navigator.serviceWorker.controller) avisar(); });
       });
+      reg.update().catch(() => {});
       document.addEventListener("visibilitychange", () => { if (!document.hidden) reg.update().catch(() => {}); });
       setInterval(() => reg.update().catch(() => {}), 60 * 60 * 1000);
     }).catch(() => {});

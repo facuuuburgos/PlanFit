@@ -1,6 +1,6 @@
 /* PlanFit · service worker: funciona sin conexión y avisa cuando hay versión nueva.
    IMPORTANTE: cada vez que cambies cualquier archivo, sube el número de VERSION. */
-const VERSION = "1.1.0";
+const VERSION = "1.1.1";
 const CACHE = "planfit-" + VERSION;
 
 const ARCHIVOS = [
