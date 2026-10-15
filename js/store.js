@@ -72,7 +72,36 @@
     const act = Array.from({ length: n }, (_, i) => set.has(i + 1));
     if (act.every(Boolean)) delete e.act; else e.act = act;
   };
+  /* ---------- ejercicios por fase ----------
+     ej.fases = ids de las fases donde aparece (si no existe, aparece en todas). De ahí se calcula ej.act (semanas). */
+  PF.sincEj = (plan, rangos, e) => {
+    if (!Array.isArray(e.fases)) { delete e.fases; delete e.act; return; }
+    const ids = e.fases.filter((id) => rangos.some((r) => r.fase.id === id));
+    if (!ids.length || ids.length === rangos.length) { delete e.fases; delete e.act; return; }
+    e.fases = ids;
+    const act = Array.from({ length: plan.semanas }, (_, i) => { const r = rangos.find((x) => i + 1 >= x.desde && i + 1 <= x.hasta); return !r || ids.includes(r.fase.id); });
+    if (act.every(Boolean)) delete e.act; else e.act = act;
+  };
+  PF.sincronizarFases = (plan) => { const rg = PF.rangosFases(plan); for (const s of plan.sesiones) for (const e of s.ejercicios) PF.sincEj(plan, rg, e); };
   PF.ponerActivo = (e, n, w, valor) => { const l = PF.semanasActivas(e, n).filter((x) => x !== w); if (valor) l.push(w); PF.ponerActivas(e, n, l); };
+  /* ---------- variantes: otro nombre para el mismo ejercicio en ciertas semanas ----------
+     ej.vars = lista (una por semana) con el nombre de la variante, o "" si esa semana usa el ejercicio original. */
+  const normN = (s) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+  PF.nombreEn = (e, w) => (e.vars && e.vars[w - 1]) || e.nombre;
+  PF.esVariante = (e, w) => !!(e.vars && e.vars[w - 1]);
+  // nombres distintos que usa el ejercicio (el original primero)
+  PF.nombresDe = (e, n, soloActivas = true) => {
+    const out = [e.nombre];
+    for (let w = 1; w <= n; w++) { if (soloActivas && !PF.activo(e, w)) continue; const x = PF.nombreEn(e, w); if (!out.includes(x)) out.push(x); }
+    return out;
+  };
+  PF.ponerVariante = (e, n, semanas, nombre) => {
+    const nuevo = normN(nombre) === normN(e.nombre) ? "" : String(nombre || "").trim();
+    const v = Array.from({ length: n }, (_, i) => (e.vars && e.vars[i]) || "");
+    for (const w of semanas) v[w - 1] = nuevo;
+    if (v.every((x) => !x)) delete e.vars; else e.vars = v;
+  };
+
   // [1,2,3,4,9] -> "1–4, 9"
   PF.textoSemanas = (lista) => {
     const l = [...lista].sort((a, b) => a - b), out = [];
@@ -119,14 +148,11 @@
       for (const e of s.ejercicios) {
         while (e.sem.length < plan.semanas) e.sem.push({ ...(e.sem[e.sem.length - 1] || PF.semanaVacia()) });
         e.sem.length = plan.semanas;
-        if (Array.isArray(e.act)) {
-          while (e.act.length < plan.semanas) e.act.push(e.act.length ? e.act[e.act.length - 1] : true);
-          e.act.length = plan.semanas;
-          if (e.act.every((x) => x !== false)) delete e.act;
-        } else delete e.act;
+        delete e.vars;
       }
     }
 
+    PF.sincronizarFases(plan);
     return plan;
   };
 

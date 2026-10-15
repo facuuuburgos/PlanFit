@@ -41,8 +41,13 @@
     const wRef = Math.max(1, Math.min(n, ctx.semana || 1));
     const rangoFase = (w) => { const f = PF.faseDeSemana(plan, w); return f ? { d: f.desde, h: f.hasta } : { d: 1, h: n }; };
     const rango = (d, hh) => Array.from({ length: hh - d + 1 }, (_, i) => d + i);
-    // un ejercicio nuevo aparece desde la semana que se está viendo hasta el final (desde la semana 1 = todo el plan)
-    if (nuevo && wRef > 1) PF.ponerActivas(borrador, n, rango(wRef, n));
+    const rangos = PF.rangosFases(plan);
+    const variasFases = rangos.length > 1;
+    // un ejercicio nuevo aparece solo en la fase que se está viendo (no se copia solo a las demás fases)
+    if (nuevo && variasFases) { const f = PF.faseDeSemana(plan, wRef); if (f) borrador.fases = [f.fase.id]; }
+    PF.sincEj(plan, rangos, borrador);
+    const idsFases = () => Array.isArray(borrador.fases) ? borrador.fases : rangos.map((r) => r.fase.id);
+    const chipsFases = () => rangos.map((r) => `<button class="chip ${idsFases().includes(r.fase.id) ? "on" : ""}" data-fase-id="${r.fase.id}"><i class="punto" style="background:${r.fase.color}"></i>${h(r.fase.nombre)}</button>`).join("");
     const rpe = plan.opciones.rpe;
 
     const filas = () => {
@@ -78,6 +83,7 @@
       <p class="ayuda">«Máximo» es la repetición máxima del cliente en este ejercicio. Si la indicas, el PDF muestra los kilos aproximados según el %.</p>
       <label class="campo"><span>Nota para el cliente (opcional)</span><input id="e-nota" value="${h(borrador.nota)}" placeholder="Ej.: Controla la bajada, profundidad hasta paralelo"></label>
 
+      ${variasFases ? `<div class="titulo-sec" style="margin-top:6px">Aparece en estas fases</div><div class="chips" id="e-fases">${chipsFases()}</div><p class="ayuda">Dentro de una fase el ejercicio se mantiene en todas sus semanas. Activa otra fase para repetirlo ahí.</p>` : ""}
       <div class="titulo-sec" style="margin-top:6px">Evolución semana a semana
         <span class="der"><button class="btn chico suave" id="e-prog">${UI.ic("wand")}Progresión rápida</button></span></div>
       <table class="tabla-sem">
@@ -98,6 +104,16 @@
     const refrescarFilas = () => { $("#e-filas", el).innerHTML = filas(); };
 
     refrescarFilas();
+
+    const cf = $("#e-fases", el);
+    if (cf) cf.addEventListener("click", (ev) => {
+      const b = ev.target.closest("[data-fase-id]"); if (!b) return;
+      const id = b.dataset.faseId, act = idsFases();
+      const nuevoSet = act.includes(id) ? act.filter((x) => x !== id) : [...act, id];
+      if (!nuevoSet.length) { UI.aviso("Debe aparecer en al menos una fase", { error: true }); return; }
+      borrador.fases = nuevoSet; PF.sincEj(plan, rangos, borrador);
+      cf.innerHTML = chipsFases(); refrescarFilas();
+    });
 
     /* sugerencias */
     const nom = $("#e-nombre", el);

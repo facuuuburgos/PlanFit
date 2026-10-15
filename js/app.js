@@ -3,7 +3,8 @@
   "use strict";
 
   const UI = root.UI, PF = root.PF, D = root.PF_DATA, Store = PF.Store, h = UI.h, $ = UI.$, $$ = UI.$$;
-  UI.VERSION = "1.6.0";
+  UI.VERSION = "1.9.0";
+  UI.lateralOculto = () => { try { return localStorage.getItem("planfit.lateralOculto") === "1"; } catch (e) { return false; } };
 
   const ancho = () => matchMedia("(min-width: 900px)").matches;
 
@@ -50,7 +51,8 @@
     const lateral = `
       <aside class="lateral">
         <div class="lat-cab"><span class="logo">${UI.ic("dumbbell")}</span><strong>PlanFit</strong>
-          <button class="icono" data-act="nuevo-cliente" aria-label="Nuevo cliente">${UI.ic("plus")}</button></div>
+          <button class="icono" data-act="nuevo-cliente" aria-label="Nuevo cliente">${UI.ic("plus")}</button>
+          <button class="icono gris" data-act="lateral" aria-label="Ocultar la lista de clientes" title="Ocultar la lista">${UI.ic("panel")}</button></div>
         <div class="lat-lista" id="lat-lista">${Store.datos.clientes.length ? UI.listaClientes(activo) : `<p class="muted peq" style="padding:10px 8px">Aún no hay clientes.</p>`}</div>
         <div class="lat-pie"><a class="btn bloque ${r.n === "ajustes" ? "suave" : ""}" href="#/ajustes">${UI.ic("settings")}Ajustes</a></div>
       </aside>`;
@@ -61,6 +63,7 @@
       <div class="principal">
         ${banner}
         <header class="barra-sup" id="barra">
+          <button class="icono gris btn-lateral" data-act="lateral" aria-label="Mostrar la lista de clientes" title="Mostrar la lista">${UI.ic("panel")}</button>
           ${vista.atras ? `<a class="icono ${vista.atras === "#/" ? "solo-movil" : ""}" href="${vista.atras}" aria-label="Volver">${UI.ic("left")}</a>` : ""}
           <h1>${h(vista.titulo)}${vista.sub ? `<span class="sub">${h(vista.sub)}</span>` : ""}</h1>
           ${vista.acciones || ""}
@@ -75,6 +78,7 @@
       </nav>`;
 
     $("#app").innerHTML = lateral + principal + tab;
+    $("#app").classList.toggle("lat-oculto", UI.lateralOculto());
     if (vista.bind) vista.bind($("#main"));
 
     if (conservarScroll) {
@@ -267,6 +271,27 @@
       }
     },
 
+    traerFase() {
+      const p = planActual(), w = Math.max(1, Math.min(p.semanas, UI.estado.semanaVista[p.id] || PF.semanaActual(p)));
+      const rg = PF.rangosFases(p), aqui = PF.faseDeSemana(p, w);
+      if (!aqui) return;
+      const todos = p.sesiones.flatMap((s) => s.ejercicios);
+      const enFase = (e, r) => !Array.isArray(e.fases) || e.fases.includes(r.fase.id);
+      const otras = rg.filter((r) => r.fase.id !== aqui.fase.id);
+      const hoja = UI.hoja({
+        titulo: "Traer ejercicios de otra fase",
+        html: `<p>Los ejercicios de la otra fase se suman a «${h(aqui.fase.nombre)}», con sus series y repeticiones. Los que ya estén aquí no se duplican.</p>
+          ${otras.map((r) => { const t = todos.filter((e) => enFase(e, r) && !enFase(e, aqui)).length; return `<button class="fila" data-fid="${r.fase.id}" ${t ? "" : "disabled"} style="box-shadow:none"><span class="t"><b>${h(r.fase.nombre)}</b><span>${t ? t + (t === 1 ? " ejercicio" : " ejercicios") + " para traer" : "Nada nuevo para traer"}</span></span></button>`; }).join("")}`,
+      });
+      hoja.el.addEventListener("click", (ev) => {
+        const b = ev.target.closest("[data-fid]"); if (!b || b.disabled) return;
+        const r = rg.find((x) => x.fase.id === b.dataset.fid);
+        let n = 0;
+        todos.forEach((e) => { if (enFase(e, r) && !enFase(e, aqui)) { e.fases = [...e.fases, aqui.fase.id]; n++; } });
+        UI.tocarPlan(p); hoja.cerrar(); UI.render(true); UI.aviso(n + (n === 1 ? " ejercicio traído" : " ejercicios traídos"));
+      });
+    },
+
     async descarga() {
       const p = planActual(), w = Math.max(1, Math.min(p.semanas, UI.estado.semanaVista[p.id] || PF.semanaActual(p)));
       const info = p.semInfo[w - 1];
@@ -326,6 +351,7 @@
     },
 
     actualizar() { aplicarActualizacion(); },
+    lateral() { const v = !UI.lateralOculto(); try { localStorage.setItem("planfit.lateralOculto", v ? "1" : "0"); } catch (e) {} $("#app").classList.toggle("lat-oculto", v); },
     "vista-ancha"(a) { Store.datos.entrenador.vistaAncha = a.dataset.v === "1"; Store.guardarYa(); UI.render(true); },
     async "buscar-act"() {
       if (!UI.reg) { UI.aviso("Las actualizaciones automáticas no están disponibles aquí"); return; }

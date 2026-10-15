@@ -421,7 +421,7 @@
       const celda = e.sem[w - 1] || PF.semanaVacia();
       const cEj = cols[1];
       const nota = [e.tempo ? `Tempo ${e.tempo}` : "", opciones.notas ? e.nota : ""].filter(Boolean).join("  ·  ");
-      const hNom = p.alturaBloque(e.nombre || "Ejercicio", cEj.w - 10, 10, "b", 12.5);
+      const hNom = p.alturaBloque(PF.nombreEn(e, w) || "Ejercicio", cEj.w - 10, 10, "b", 12.5);
       const hNota = nota ? p.alturaBloque(nota, cEj.w - 10, 8, "r", 10.5) + 1 : 0;
       const h = Math.max(30, hNom + hNota + 14);
 
@@ -438,7 +438,7 @@
         }
 
         const top = yy + (h - hNom - hNota) / 2;
-        p.bloque(e.nombre || "Ejercicio", cEj.x, top, cEj.w - 10, { size: 10, color: TINTA, lh: 12.5 });
+        p.bloque(PF.nombreEn(e, w) || "Ejercicio", cEj.x, top, cEj.w - 10, { size: 10, color: TINTA, lh: 12.5 });
         if (nota) p.bloque(nota, cEj.x, top + hNom + 1, cEj.w - 10, { size: 8, color: GRIS, lh: 10.5 });
 
         const cy = yy + h / 2 - 6;
@@ -589,8 +589,15 @@
 
           yy = cabecera(p, yy);
 
-          listaB.forEach((e, k) => {
-            const hNom = p.alturaBloque(e.nombre || "Ejercicio", nameW - 14, 9, "b", 11.5, 2);
+          // un ejercicio con variantes se reparte en una fila por nombre efectivo
+          const filasB = [];
+          listaB.forEach((e) => {
+            const nombres = [...new Set(bloque.filter((w) => PF.activo(e, w)).map((w) => PF.nombreEn(e, w)))];
+            nombres.forEach((nm) => filasB.push({ e, nm }));
+          });
+
+          filasB.forEach(({ e, nm }, k) => {
+            const hNom = p.alturaBloque(nm || "Ejercicio", nameW - 14, 9, "b", 11.5, 2);
             const h = Math.max(32, hNom + 12);
 
             if (yy + h > LIMITE) {
@@ -600,14 +607,14 @@
               yy = cabecera(p, S.y + 16);
             }
 
-            p.bloque(e.nombre || "Ejercicio", M + 10, yy + (h - hNom) / 2, nameW - 14, { size: 9, font: "b", color: TINTA, lh: 11.5, maxLines: 2 });
+            p.bloque(nm || "Ejercicio", M + 10, yy + (h - hNom) / 2, nameW - 14, { size: 9, font: "b", color: TINTA, lh: 11.5, maxLines: 2 });
 
             bloque.forEach((w, i) => {
               const c = e.sem[w - 1];
               if (!c) return;
               const x = M + nameW + i * cw + cw / 2;
-              if (!PF.activo(e, w)) { p.text("—", x, yy + h / 2 - 5, { size: 9, color: "#CFCBC2", align: "center" }); return; }
-              const prev = PF.activo(e, w - 1) ? e.sem[w - 2] : null;   // si el ejercicio recién aparece, no se marca como cambio
+              if (!PF.activo(e, w) || PF.nombreEn(e, w) !== nm) { p.text("—", x, yy + h / 2 - 5, { size: 9, color: "#CFCBC2", align: "center" }); return; }
+              const prev = PF.activo(e, w - 1) && PF.nombreEn(e, w - 1) === nm ? e.sem[w - 2] : null;   // si el ejercicio recién aparece, no se marca como cambio
               const cambio = (campo) => prev && String(prev[campo] ?? "") !== String(c[campo] ?? "") && w !== semanas[0];
               const l1 = fmtSR(c);
               const cambia1 = cambio("s") || cambio("r");
