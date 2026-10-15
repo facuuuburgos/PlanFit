@@ -155,23 +155,23 @@
     const tab = UI.estado.tab;
 
     if (UI.amplia()) {
-      const der = UI.estado.tabDer === "pdf" ? "pdf" : "plan";
+      const der = UI.estado.tabDer === "pdf" ? "pdf" : UI.estado.tabDer === "semanas" ? "semanas" : "plan";
       const izq = tabSesiones(plan, cli);
-      const dr = der === "pdf" ? tabPDF(plan, cli) : tabPlan(plan, cli);
+      const dr = der === "pdf" ? tabPDF(plan, cli) : der === "semanas" ? tabSemanas(plan, cli) : tabPlan(plan, cli);
       return {
         titulo: plan.titulo || "Plan", sub: cli ? cli.nombre : "", atras: cli ? `#/c/${cli.id}` : "#/",
         acciones: `<button class="icono" data-act="menu-plan" aria-label="Más opciones">${UI.ic("dots")}</button>`,
-        html: `<div class="dos-col">
+        html: `<div class="dos-col ${der === "semanas" ? "mx-ancho" : ""}">
           <div class="col-izq">${izq.html}</div>
-          <div class="col-der"><div class="seg col-der-tabs">${[["plan", "Plan y gráfica"], ["pdf", "PDF"]].map(([k, t]) => `<button data-tab-der="${k}" class="${der === k ? "on" : ""}">${t}</button>`).join("")}</div>${dr.html}</div></div>`,
+          <div class="col-der"><div class="seg col-der-tabs">${[["plan", "Plan"], ["semanas", "Semanas"], ["pdf", "PDF"]].map(([k, t]) => `<button data-tab-der="${k}" class="${der === k ? "on" : ""}">${t}</button>`).join("")}</div>${dr.html}</div></div>`,
         bind(el) { izq.bind && izq.bind(el); dr.bind && dr.bind(el); },
       };
     }
 
     const tabs = `<div class="tabs-plan"><div class="seg">
-      ${[["plan", "Plan"], ["sesiones", "Sesiones"], ["pdf", "PDF"]].map(([k, t]) => `<button data-tab="${k}" class="${tab === k ? "on" : ""}">${t}</button>`).join("")}</div></div>`;
+      ${[["plan", "Plan"], ["semanas", "Semanas"], ["sesiones", "Sesiones"], ["pdf", "PDF"]].map(([k, t]) => `<button data-tab="${k}" class="${tab === k ? "on" : ""}">${t}</button>`).join("")}</div></div>`;
 
-    const cuerpo = tab === "plan" ? tabPlan(plan, cli) : tab === "pdf" ? tabPDF(plan, cli) : tabSesiones(plan, cli);
+    const cuerpo = tab === "plan" ? tabPlan(plan, cli) : tab === "pdf" ? tabPDF(plan, cli) : tab === "semanas" ? tabSemanas(plan, cli) : tabSesiones(plan, cli);
 
     return {
       titulo: plan.titulo || "Plan", sub: cli ? cli.nombre : "", atras: cli ? `#/c/${cli.id}` : "#/",
@@ -474,6 +474,177 @@
         $$("[data-menu-ses]", el).forEach((b) => b.addEventListener("click", () => menuSesion(plan, +b.dataset.menuSes)));
       },
     };
+  }
+
+  /* ---------- pestaña SEMANAS: el plan completo de un vistazo ---------- */
+
+  function tabSemanas(plan, cli) {
+    const n = plan.semanas;
+    const wVista = semanaVista(plan);
+    const chica = innerWidth < 520 || (UI.amplia() && UI.estado.tabDer === "semanas");
+    const CW = chica ? 21 : 26, GAP = chica ? 2 : 3, NW = chica ? 112 : 132;                         // ancho de celda, separación y columna de nombres
+    const anchoCeldas = n * (CW + GAP);
+    const rangos = PF.rangosFases(plan);
+    const curva = PF.curva(plan);
+
+    const cabecera = `
+      <div class="mx-fila mx-cab">
+        <div class="mx-n"></div>
+        <div class="mx-c" style="width:${anchoCeldas}px">
+          <div class="mx-fases">${rangos.map((r) => `<span style="left:${(r.desde - 1) * (CW + GAP)}px;width:${(r.hasta - r.desde + 1) * (CW + GAP) - GAP}px;background:${r.fase.color}" title="${h(r.fase.nombre)}">${h(r.fase.nombre)}</span>`).join("")}</div>
+          <div class="mx-sem">${Array.from({ length: n }, (_, i) => `<button data-ir-sem="${i + 1}" class="${i + 1 === wVista ? "on" : ""} ${plan.semInfo[i].descarga ? "desc" : ""}" style="width:${CW}px" aria-label="Ver la semana ${i + 1}">${i + 1}</button>`).join("")}</div>
+        </div>
+      </div>`;
+
+    const filas = plan.sesiones.map((ses, si) => {
+      const dia = ses.dia ? ses.dia.slice(0, 3).toUpperCase() : "";
+      const ejs = ses.ejercicios.map((e) => {
+        const act = PF.semanasActivas(e, n);
+        const f = (w) => { const x = PF.faseDeSemana(plan, w); return x ? x.fase.color : "#8A93A6"; };
+        return `<div class="mx-fila" data-fe="${e.id}">
+          <button class="mx-n mx-nombre" data-fila-menu="${e.id}" title="${h(e.nombre)}"><b>${h(e.nombre || "Ejercicio")}</b><small data-cuenta>${act.length === n ? "Todo el plan" : act.length + (act.length === 1 ? " semana" : " semanas")}</small></button>
+          <div class="mx-c" style="width:${anchoCeldas}px">${Array.from({ length: n }, (_, i) => `<i data-e="${e.id}" data-w="${i + 1}" class="${PF.activo(e, i + 1) ? "on" : ""} ${i + 1 === wVista ? "vista" : ""}" style="--c:${f(i + 1)};width:${CW}px"></i>`).join("")}</div>
+        </div>`;
+      }).join("");
+      return `<div class="mx-grupo">
+        <div class="mx-fila mx-dia"><div class="mx-n"><span class="mx-dia-t">${dia ? `<em>${h(dia)}</em>` : ""}${h(ses.nombre || "Sesión " + (si + 1))}</span></div>
+          <div class="mx-c" style="width:${anchoCeldas}px"></div></div>
+        ${ejs}
+        <div class="mx-fila"><button class="mx-n mx-add" data-mx-add="${si}">${UI.ic("plus")}Ejercicio</button><div class="mx-c" style="width:${anchoCeldas}px"></div></div>
+      </div>`;
+    }).join("");
+
+    const pie = `<div class="mx-fila mx-pie"><div class="mx-n"><small>Series / semana</small></div>
+      <div class="mx-c" style="width:${anchoCeldas}px">${curva.map((c) => `<span data-ser="${c.w}" style="width:${CW}px">${c.series || ""}</span>`).join("")}</div></div>`;
+
+    return {
+      html: `
+        <p class="ayuda" style="margin:4px 2px 12px">Aquí ves todo el plan junto. Toca un cuadro para que ese ejercicio aparezca (o no) en esa semana, toca el nombre para más opciones, o toca el número de una semana para abrirla.</p>
+        ${plan.sesiones.length ? `<div class="mx-marco"><div class="mx" id="mx" style="--nw:${NW}px;--g:${GAP}px;min-width:${NW + anchoCeldas}px">${cabecera}${filas}${pie}</div></div>
+          <button class="btn bloque" data-act="nueva-sesion" style="margin-top:12px">${UI.ic("plus")}Añadir día</button>`
+          : `<div class="vacio"><div class="ic">${UI.ic("dumbbell")}</div><h2>Todavía no hay días</h2><p>Crea el primer día de entrenamiento y después decide en qué semanas aparece cada ejercicio.</p><button class="btn primario" data-act="nueva-sesion">${UI.ic("plus")}Añadir día</button></div>`}
+        <p class="ayuda" style="margin-top:12px">Un cuadro de color = el ejercicio está en esa semana. Los valores (series, repeticiones, %) se ajustan en la pestaña <b>Sesiones</b>.</p>`,
+      bind(el) {
+        const mx = $("#mx", el), marco = $(".mx-marco", el);
+        if (marco) {
+          // recuerda el desplazamiento horizontal al volver a dibujar
+          const sc = UI.estado.mxScroll && UI.estado.mxScroll[plan.id];
+          if (sc) marco.scrollLeft = sc; else { const on = $(".mx-sem .on", el); if (on) marco.scrollLeft = Math.max(0, on.offsetLeft - marco.clientWidth / 2); }
+          marco.addEventListener("scroll", () => { (UI.estado.mxScroll = UI.estado.mxScroll || {})[plan.id] = marco.scrollLeft; }, { passive: true });
+        }
+
+        const buscar = (id) => plan.sesiones.flatMap((x) => x.ejercicios).find((x) => x.id === id);
+        const refrescarFila = (e) => {
+          const fila = $(`[data-fe="${e.id}"]`, el); if (!fila) return;
+          $$("i[data-w]", fila).forEach((c) => c.classList.toggle("on", PF.activo(e, +c.dataset.w)));
+          const t = PF.semanasActivas(e, n).length;
+          const cu = $("[data-cuenta]", fila); if (cu) cu.textContent = t === n ? "Todo el plan" : t + (t === 1 ? " semana" : " semanas");
+          for (let w = 1; w <= n; w++) { const sp = $(`[data-ser="${w}"]`, el); if (sp) { const r = PF.resumenSemana(plan, w).series; sp.textContent = r || ""; } }
+        };
+        const poner = (celda, valor) => {
+          const e = buscar(celda.dataset.e), w = +celda.dataset.w;
+          if (!e || PF.activo(e, w) === valor) return;
+          PF.ponerActivo(e, n, w, valor); tocarPlan(plan); refrescarFila(e);
+        };
+
+        // táctil / lápiz: un toque cambia el cuadro · ratón: se puede arrastrar para "pintar" varias semanas
+        let pintando = null, ignorarClick = false;
+        el.addEventListener("pointerdown", (ev) => {
+          const c = ev.target.closest("i[data-e]");
+          if (!c || ev.pointerType !== "mouse" || ev.button !== 0) return;
+          const e = buscar(c.dataset.e); if (!e) return;
+          pintando = { id: c.dataset.e, valor: !PF.activo(e, +c.dataset.w) };
+          ignorarClick = true; poner(c, pintando.valor); ev.preventDefault();
+        });
+        el.addEventListener("pointermove", (ev) => {
+          if (!pintando) return;
+          const x = document.elementFromPoint(ev.clientX, ev.clientY), c = x && x.closest && x.closest("i[data-e]");
+          if (c && c.dataset.e === pintando.id) poner(c, pintando.valor);
+        });
+        const fin = () => { pintando = null; };
+        window.addEventListener("pointerup", fin); window.addEventListener("pointercancel", fin);
+
+        el.addEventListener("click", (ev) => {
+          const c = ev.target.closest("i[data-e]");
+          if (c) {
+            if (ignorarClick) { ignorarClick = false; return; }
+            const e = buscar(c.dataset.e); if (e) poner(c, !PF.activo(e, +c.dataset.w));
+            return;
+          }
+          const sw = ev.target.closest("[data-ir-sem]");
+          if (sw) {
+            UI.estado.semanaVista[plan.id] = +sw.dataset.irSem;
+            if (!UI.amplia()) UI.estado.tab = "sesiones";
+            UI.render(true); document.scrollingElement.scrollTop = 0; return;
+          }
+          const m = ev.target.closest("[data-fila-menu]");
+          if (m) { const e = buscar(m.dataset.filaMenu); if (e) menuFila(plan, e, refrescarFila); return; }
+          const add = ev.target.closest("[data-mx-add]");
+          if (add) {
+            const ses = plan.sesiones[+add.dataset.mxAdd];
+            UI.editarEjercicio(plan, null, (ej) => { ses.ejercicios.push(ej); tocarPlan(plan); UI.render(true); }, null, { semana: 1 });
+          }
+        });
+      },
+    };
+  }
+
+  // Opciones de una fila de la grilla: en qué fases aparece, editar, cambiar por otro, eliminar
+  function menuFila(plan, e, refrescarFila) {
+    const n = plan.semanas, rangos = PF.rangosFases(plan);
+    const semDe = (r) => Array.from({ length: r.hasta - r.desde + 1 }, (_, i) => r.desde + i);
+    const completa = (r) => semDe(r).every((w) => PF.activo(e, w));
+    const chips = () => `
+      <button class="chip ${PF.semanasActivas(e, n).length === n ? "on" : ""}" data-todo>Todo el plan</button>
+      ${rangos.map((r, i) => `<button class="chip ${completa(r) ? "on" : ""}" data-fase="${i}" style="--c:${r.fase.color}"><i class="punto" style="background:${r.fase.color}"></i>${h(r.fase.nombre)}</button>`).join("")}`;
+    const resumen = () => { const l = PF.semanasActivas(e, n); return l.length === n ? "Aparece en todas las semanas." : l.length ? `Aparece en las semanas ${PF.textoSemanas(l)}.` : "No aparece en ninguna semana."; };
+
+    const hoja = UI.hoja({
+      titulo: e.nombre || "Ejercicio",
+      html: `
+        ${rangos.length ? `<div class="titulo-sec" style="margin-top:0">Aparece en</div><div class="chips" id="mf-chips">${chips()}</div>` : ""}
+        <p class="ayuda" id="mf-txt" style="margin:8px 0 14px">${resumen()}</p>
+        <div class="lista-acc">
+          <button class="btn bloque" id="mf-edit">${UI.ic("settings")}Editar series, repeticiones y %</button>
+          <button class="btn bloque" id="mf-cambiar">${UI.ic("swap")}Cambiar por otro ejercicio</button>
+          <button class="btn peligro bloque" id="mf-borrar">${UI.ic("trash")}Eliminar ejercicio</button>
+        </div>`,
+    });
+    const el = hoja.el;
+    const pintar = () => { const c = $("#mf-chips", el); if (c) c.innerHTML = chips(); $("#mf-txt", el).textContent = resumen(); refrescarFila(e); };
+    el.addEventListener("click", (ev) => {
+      if (ev.target.closest("[data-todo]")) { PF.ponerActivas(e, n, Array.from({ length: n }, (_, i) => i + 1)); tocarPlan(plan); pintar(); return; }
+      const f = ev.target.closest("[data-fase]");
+      if (f) {
+        const r = rangos[+f.dataset.fase], semR = semDe(r);
+        let act = PF.semanasActivas(e, n);
+        act = completa(r) ? act.filter((w) => !semR.includes(w)) : [...new Set([...act, ...semR])];
+        PF.ponerActivas(e, n, act); tocarPlan(plan); pintar();
+      }
+    });
+    $("#mf-edit", el).addEventListener("click", () => {
+      hoja.cerrar();
+      const ses = plan.sesiones.find((s) => s.ejercicios.includes(e));
+      UI.editarEjercicio(plan, e, (ej) => { const i = ses.ejercicios.indexOf(e); ses.ejercicios[i] = ej; tocarPlan(plan); UI.render(true); }, () => { ses.ejercicios.splice(ses.ejercicios.indexOf(e), 1); tocarPlan(plan); UI.render(true); }, { semana: PF.semanasActivas(e, n)[0] || 1 });
+    });
+    $("#mf-cambiar", el).addEventListener("click", () => {
+      const act = PF.semanasActivas(e, n);
+      if (!act.length) { UI.aviso("Primero haz que el ejercicio aparezca en alguna semana", { error: true }); return; }
+      hoja.cerrar();
+      const ses = plan.sesiones.find((s) => s.ejercicios.includes(e));
+      UI.reemplazarEjercicio(plan, e, act[0], (nuevoEj, quedan) => {
+        const i = ses.ejercicios.indexOf(e);
+        if (quedan.length) { PF.ponerActivas(e, n, quedan); ses.ejercicios.splice(i + 1, 0, nuevoEj); } else ses.ejercicios[i] = nuevoEj;
+        tocarPlan(plan); UI.render(true); UI.aviso("Ejercicio cambiado");
+      });
+    });
+    $("#mf-borrar", el).addEventListener("click", async () => {
+      if (await UI.confirmar("Eliminar ejercicio", `¿Eliminar «${e.nombre || "este ejercicio"}» de todas las semanas?`, { si: "Eliminar", peligro: true })) {
+        hoja.cerrar();
+        const ses = plan.sesiones.find((s) => s.ejercicios.includes(e));
+        if (ses) { ses.ejercicios.splice(ses.ejercicios.indexOf(e), 1); tocarPlan(plan); UI.render(true); }
+      }
+    });
   }
 
   /* ---------- reordenar ejercicios arrastrando ---------- */

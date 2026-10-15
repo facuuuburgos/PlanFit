@@ -3,7 +3,7 @@
   "use strict";
 
   const UI = root.UI, PF = root.PF, D = root.PF_DATA, Store = PF.Store, h = UI.h, $ = UI.$, $$ = UI.$$;
-  UI.VERSION = "1.5.1";
+  UI.VERSION = "1.6.0";
 
   const ancho = () => matchMedia("(min-width: 900px)").matches;
 

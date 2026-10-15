@@ -78,17 +78,6 @@
       <p class="ayuda">«Máximo» es la repetición máxima del cliente en este ejercicio. Si la indicas, el PDF muestra los kilos aproximados según el %.</p>
       <label class="campo"><span>Nota para el cliente (opcional)</span><input id="e-nota" value="${h(borrador.nota)}" placeholder="Ej.: Controla la bajada, profundidad hasta paralelo"></label>
 
-      <div class="titulo-sec" style="margin-top:6px">¿En qué semanas aparece?
-        ${nuevo ? "" : `<span class="der"><button class="btn chico suave" id="e-cambiar">${UI.ic("swap")}Cambiar por otro</button></span>`}</div>
-      <div class="chips" id="e-q">
-        <button class="chip" data-q="todo">Todo el plan</button>
-        ${plan.fases.length > 1 ? `<button class="chip" data-q="fase">Solo esta fase</button>` : ""}
-        <button class="chip" data-q="desde">Desde la semana ${wRef}</button>
-        <button class="chip" data-q="solo">Solo la semana ${wRef}</button>
-      </div>
-      <div class="act-strip" id="e-act"></div>
-      <p class="ayuda" id="e-act-txt"></p>
-
       <div class="titulo-sec" style="margin-top:6px">Evolución semana a semana
         <span class="der"><button class="btn chico suave" id="e-prog">${UI.ic("wand")}Progresión rápida</button></span></div>
       <table class="tabla-sem">
@@ -108,29 +97,7 @@
 
     const refrescarFilas = () => { $("#e-filas", el).innerHTML = filas(); };
 
-    /* semanas en las que aparece */
-    const pintarAct = () => {
-      $("#e-act", el).innerHTML = Array.from({ length: n }, (_, i) => {
-        const w = i + 1, f = PF.faseDeSemana(plan, w), on = PF.activo(borrador, w);
-        return `<button data-aw="${w}" class="${on ? "on" : ""} ${w === wRef ? "ref" : ""}" style="--c:${f ? f.fase.color : "#8A93A6"}" aria-pressed="${on}">${w}</button>`;
-      }).join("");
-      const l = PF.semanasActivas(borrador, n);
-      $("#e-act-txt", el).textContent = l.length === n ? "Aparece en todas las semanas del plan." : l.length ? `Aparece en: semanas ${PF.textoSemanas(l)}.` : "No aparece en ninguna semana: elige al menos una.";
-      refrescarFilas();
-    };
-    $("#e-act", el).addEventListener("click", (e) => {
-      const b = e.target.closest("[data-aw]"); if (!b) return;
-      const w = +b.dataset.aw; PF.ponerActivo(borrador, n, w, !PF.activo(borrador, w)); pintarAct();
-    });
-    $("#e-q", el).addEventListener("click", (e) => {
-      const b = e.target.closest("[data-q]"); if (!b) return;
-      const q = b.dataset.q, r = rangoFase(wRef);
-      PF.ponerActivas(borrador, n, q === "todo" ? rango(1, n) : q === "fase" ? rango(r.d, r.h) : q === "desde" ? rango(wRef, n) : [wRef]);
-      pintarAct();
-    });
-    const cam = $("#e-cambiar", el);
-    if (cam) cam.addEventListener("click", () => UI.reemplazarEjercicio(plan, borrador, wRef, (nuevoEj, quitarViejo) => { hoja.cerrar(); alReemplazar && alReemplazar(nuevoEj, quitarViejo, borrador); }));
-    pintarAct();
+    refrescarFilas();
 
     /* sugerencias */
     const nom = $("#e-nombre", el);
@@ -186,7 +153,6 @@
     $("#e-ok", el).addEventListener("click", () => {
       borrador.nombre = borrador.nombre.trim();
       if (!borrador.nombre) { UI.aviso("Escribe el nombre del ejercicio", { error: true }); $("#e-nombre", el).focus(); return; }
-      if (!PF.semanasActivas(borrador, n).length) { UI.aviso("Elige al menos una semana en la que aparezca", { error: true }); return; }
       borrador.super = String(borrador.super || "").trim().toUpperCase();
       for (const c of borrador.sem) { if (c.s === "") c.s = 0; if (c.d === "") c.d = 0; }
       UI.recordarEjercicio(borrador.nombre);
