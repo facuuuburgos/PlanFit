@@ -1,10 +1,10 @@
 /* PlanFit · estilos */
 :root {
   --acento: #2F6BFF; --acento-suave: rgba(47,107,255,.12); --acento-txt: #fff;
-  --bg: #F2F4F8; --card: #FFFFFF; --txt: #161B2E; --txt2: #5E6779; --txt3: #8A93A6;
-  --linea: #E4E8F0; --relleno: #F5F7FB; --relleno2: #EBEEF5;
+  --bg: #E6EAF2; --card: #FFFFFF; --txt: #0C1122; --txt2: #404A5F; --txt3: #66708A;
+  --linea: #C9D0DF; --relleno: #EBEEF5; --relleno2: #DCE2EE;
   --ok: #17A673; --aviso: #C77700; --aviso-bg: #FFF4E0; --peligro: #D63A4F;
-  --sombra: 0 1px 2px rgba(22,27,46,.05), 0 6px 20px rgba(22,27,46,.06);
+  --sombra: 0 1px 2px rgba(12,17,34,.10), 0 8px 22px rgba(12,17,34,.09);
   --sombra-alta: 0 10px 40px rgba(10,14,30,.28);
   --radio: 16px; --radio-s: 11px;
   --sup: env(safe-area-inset-top, 0px); --inf: env(safe-area-inset-bottom, 0px);
@@ -386,3 +386,22 @@ body {
 .campo .stepper { overflow: hidden; }
 .campo .stepper button { width: 34px; flex: none; }
 .campo .stepper small { flex: none; padding-right: 2px; }
+
+/* modo claro: más contraste */
+@media (prefers-color-scheme: light) {
+  .tarjeta, .sesion, .fila { border-color: #C3CBDB; }
+  .campo input, .campo select, .campo textarea, .stepper { box-shadow: inset 0 0 0 1px #C9D0DF; }
+  .seg { box-shadow: inset 0 0 0 1px #CCD3E1; }
+  .tabbar { border-top: 1px solid #C3CBDB; background: color-mix(in srgb, #fff 82%, transparent); }
+  .barra-sup.borde { border-bottom-color: #C3CBDB; }
+  .tarjeta > h2, .seccion-t { color: var(--txt2); }
+}
+
+.lista-fases { display: grid; gap: 8px; }
+.fila-fase { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--linea); background: var(--card); text-align: left; width: 100%; transition: transform .3s var(--resorte), border-color .2s, background .2s; }
+.fila-fase:active { transform: scale(.97); }
+.fila-fase i { width: 14px; height: 14px; border-radius: 50%; flex: none; }
+.fila-fase span { display: flex; flex-direction: column; min-width: 0; }
+.fila-fase b { font-size: 15px; } .fila-fase small { color: var(--txt2); font-size: 12.5px; }
+.fila-fase.on { border-color: var(--acento); background: var(--acento-suave); box-shadow: 0 0 0 1px var(--acento); }
+.lista-fases + .ayuda { margin-top: 12px; }

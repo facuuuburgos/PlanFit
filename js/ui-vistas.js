@@ -439,6 +439,8 @@
     const o = plan.opciones;
     const ent = Store.datos.entrenador;
     const opSem = (sel) => Array.from({ length: plan.semanas }, (_, i) => `<option value="${i + 1}" ${i + 1 === sel ? "selected" : ""}>Semana ${i + 1}</option>`).join("");
+    const rangosF = PF.rangosFases(plan);
+    if (e.fase == null || e.fase >= rangosF.length) e.fase = 0;
     const hayEj = plan.sesiones.some((s) => s.ejercicios.length);
 
     return {
@@ -448,15 +450,18 @@
         <div class="tarjeta">
           <h2>¿Qué quieres enviar?</h2>
           <div class="seg" style="margin-bottom:12px">
-            <button data-al="semana" class="${e.alcance === "semana" ? "on" : ""}">Una semana</button>
+            <button data-al="semana" class="${e.alcance === "semana" ? "on" : ""}">Semana</button>
             <button data-al="rango" class="${e.alcance === "rango" ? "on" : ""}">Varias</button>
-            <button data-al="completo" class="${e.alcance === "completo" ? "on" : ""}">Completo</button>
+            <button data-al="fase" class="${e.alcance === "fase" ? "on" : ""}">Fase</button>
+            <button data-al="completo" class="${e.alcance === "completo" ? "on" : ""}">Todo</button>
           </div>
           ${e.alcance === "semana" ? `<label class="campo"><span>Semana</span><select id="pdf-semana">${opSem(e.semana)}</select></label>
-            <p class="ayuda">Ideal para enviar la rutina de la semana. La gráfica marca en qué momento del plan está esa semana.</p>` : ""}
+            <p class="ayuda">Solo la rutina de esa semana. La gráfica resalta qué parte del plan cubre.</p>` : ""}
           ${e.alcance === "rango" ? `<div class="cols2"><label class="campo"><span>Desde</span><select id="pdf-desde">${opSem(e.desde)}</select></label><label class="campo"><span>Hasta</span><select id="pdf-hasta">${opSem(e.hasta)}</select></label></div>
-            <p class="ayuda">Incluye una página por semana y un cuadro de evolución.</p>` : ""}
-          ${e.alcance === "completo" ? `<p class="ayuda" style="margin:0">Incluye las ${plan.semanas} semanas, el cuadro de evolución y la hoja de seguimiento. La gráfica marca la semana actual (${hoy}).</p>` : ""}
+            <p class="ayuda">Una página por semana y un cuadro de evolución. La gráfica resalta el tramo incluido.</p>` : ""}
+          ${e.alcance === "fase" ? (rangosF.length ? `<div class="lista-fases">${rangosF.map((r, i) => `<button class="fila-fase ${i === e.fase ? "on" : ""}" data-fase="${i}"><i style="background:${r.fase.color}"></i><span><b>${h(r.fase.nombre)}</b><small>Semanas ${r.desde}–${r.hasta} · ${r.hasta - r.desde + 1} sem</small></span></button>`).join("")}</div>
+            <p class="ayuda">Envía una fase por vez, con su cuadro de evolución. La gráfica resalta esa fase.</p>` : `<p class="ayuda" style="margin:0">Este plan todavía no tiene fases. Agrégalas en la pestaña Plan.</p>`) : ""}
+          ${e.alcance === "completo" ? `<p class="ayuda" style="margin:0">Incluye las ${plan.semanas} semanas, el cuadro de evolución y la hoja de seguimiento. </p>` : ""}
         </div>
 
         <div class="tarjeta">
@@ -478,6 +483,7 @@
         <p class="ayuda" id="pdf-info" style="text-align:center;margin-top:12px"></p>`,
       bind(el) {
         $$("[data-al]", el).forEach((b) => b.addEventListener("click", () => { e.alcance = b.dataset.al; UI.render(true); }));
+        $$("[data-fase]", el).forEach((b) => b.addEventListener("click", () => { e.fase = +b.dataset.fase; UI.render(true); }));
         const s = $("#pdf-semana", el); if (s) s.addEventListener("change", () => { e.semana = +s.value; });
         const d = $("#pdf-desde", el), hh = $("#pdf-hasta", el);
         if (d) d.addEventListener("change", () => { e.desde = +d.value; if (e.hasta < e.desde) { e.hasta = e.desde; hh.value = e.hasta; } });

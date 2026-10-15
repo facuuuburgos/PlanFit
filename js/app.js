@@ -3,7 +3,7 @@
   "use strict";
 
   const UI = root.UI, PF = root.PF, D = root.PF_DATA, Store = PF.Store, h = UI.h, $ = UI.$, $$ = UI.$$;
-  UI.VERSION = "1.1.1";
+  UI.VERSION = "1.3.0";
 
   const ancho = () => matchMedia("(min-width: 900px)").matches;
 
@@ -346,9 +346,11 @@
     const plan = planActual(), cli = Store.cliente(plan.clienteId);
     const e = UI.estado.pdf;
     const alcance = e.alcance;
-    const op = { alcance, semana: e.semana, desde: e.desde, hasta: e.hasta };
+    const rf = PF.rangosFases(plan)[e.fase || 0];
+    const op = { alcance: alcance === "fase" && !rf ? "completo" : alcance, semana: e.semana, desde: e.desde, hasta: e.hasta };
+    if (alcance === "fase" && rf) { op.desde = rf.desde; op.hasta = rf.hasta; }
     const bytes = root.PlanPDF.generar(plan, cli, Store.datos.entrenador, op);
-    const suf = alcance === "semana" ? `Semana_${e.semana}` : alcance === "rango" ? `Semanas_${e.desde}-${e.hasta}` : "Completo";
+    const suf = alcance === "semana" ? `Semana_${e.semana}` : alcance === "rango" ? `Semanas_${e.desde}-${e.hasta}` : alcance === "fase" && rf ? `Fase_${UI.nombreArchivo(rf.fase.nombre)}_Sem_${rf.desde}-${rf.hasta}` : "Completo";
     const nombre = [UI.nombreArchivo(cli && cli.nombre), UI.nombreArchivo(plan.titulo), suf].filter(Boolean).join("_") + ".pdf";
     let paginas = 0;
     try { const txt = new TextDecoder("latin1").decode(bytes); paginas = (txt.match(/\/Type \/Page /g) || []).length; } catch (x) { /* nada */ }

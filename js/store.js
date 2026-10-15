@@ -79,7 +79,7 @@
       id: PF.id(), clienteId, titulo: "Plan de entrenamiento", inicio: PF.hoyISO(), semanas: pl.semanas, semanaManual: null,
       fases: pl.fases.map((f, i) => ({ id: PF.id(), nombre: f.nombre, semanas: f.semanas, objetivo: f.objetivo, color: D.FASES_COLORES[i % D.FASES_COLORES.length] })),
       semInfo: [], sesiones: [],
-      opciones: { pct: true, kg: true, rpe: false, tempo: false, notas: true, registro: true, seguimiento: true, recomendaciones: true },
+      opciones: { pct: true, kg: true, rpe: false, tempo: false, notas: true, registro: true, seguimiento: true, recomendaciones: false },
       recomendaciones: D.RECOMENDACIONES_BASE.slice(), notas: "", creado: Date.now(), modificado: Date.now(),
     };
     PF.normalizarPlan(plan);
@@ -88,7 +88,7 @@
 
   /* ---------- normalización ---------- */
 
-  PF.OPCIONES_BASE = { pct: true, kg: true, rpe: false, tempo: false, notas: true, registro: true, seguimiento: true, recomendaciones: true };
+  PF.OPCIONES_BASE = { pct: true, kg: true, rpe: false, tempo: false, notas: true, registro: true, seguimiento: true, recomendaciones: false };
 
   PF.normalizarPlan = (plan) => {
     plan.opciones = Object.assign({}, PF.OPCIONES_BASE, plan.opciones || {});
