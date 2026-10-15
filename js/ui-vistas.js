@@ -8,7 +8,7 @@
   UI.estado = { abierto: {}, vista: (() => { try { return localStorage.getItem("planfit.vista") || "compacta"; } catch (e) { return "compacta"; } })(), tab: "sesiones", semanaVista: {}, pdf: { alcance: "semana", desde: 1, hasta: 4, semana: null }, busqueda: "" };
 
   // Pantalla grande (iPad horizontal / computadora): distribución en dos columnas
-  UI.amplia = () => matchMedia("(min-width: 1100px)").matches && Store.datos.entrenador.vistaAncha !== false;
+  UI.amplia = () => (matchMedia("(min-width: 1100px)").matches || (matchMedia("(min-width: 900px)").matches && UI.lateralOculto())) && Store.datos.entrenador.vistaAncha !== false;
   UI.anchoGrafica = () => {
     if (UI.amplia()) {
       const total = Math.min(innerWidth - 320, 1500) - 28;
@@ -374,6 +374,7 @@
               <label><span>Desc. s</span><input data-c="d" inputmode="numeric" value="${h(c.d)}"></label>
               <label><span>%</span><input data-c="i" inputmode="decimal" value="${h(c.i ?? "")}" placeholder="–"><div class="kg" data-kg>${kg ? kg + " kg" : "&nbsp;"}</div></label>
               ${rpe ? `<label><span>RPE</span><input data-c="rpe" inputmode="decimal" value="${h(c.rpe ?? "")}" placeholder="–"></label>` : ""}
+              <button class="del-ej" data-del-ej="${si}:${ei}">${UI.ic("trash")}Eliminar ejercicio</button>
             </div>` : ""}
           </div>`;
         }).join("")}
@@ -432,6 +433,12 @@
           const [si, ei] = b.dataset.editEj.split(":").map(Number);
           const ses = plan.sesiones[si];
           UI.editarEjercicio(plan, ses.ejercicios[ei], (ej) => { ses.ejercicios[ei] = ej; tocarPlan(plan); UI.render(true); }, () => { ses.ejercicios.splice(ei, 1); tocarPlan(plan); UI.render(true); }, { semana: w });
+        }));
+
+        $$("[data-del-ej]", el).forEach((b) => b.addEventListener("click", async () => {
+          const [si, ei] = b.dataset.delEj.split(":").map(Number);
+          const ses = plan.sesiones[si], e = ses.ejercicios[ei];
+          if (await UI.confirmar("Eliminar ejercicio", `¿Eliminar «${e.nombre || "este ejercicio"}» de «${ses.nombre || "la sesión"}»?`, { si: "Eliminar", peligro: true })) { ses.ejercicios.splice(ei, 1); tocarPlan(plan); UI.render(true); UI.aviso("Ejercicio eliminado"); }
         }));
 
         activarArrastre(el, plan, w);
@@ -569,10 +576,29 @@
     UI.aviso("Sesión duplicada");
   }
 
+  function quitarEjercicios(plan, si) {
+    const ses = plan.sesiones[si];
+    const hoja = UI.hoja({
+      titulo: "Quitar ejercicios", clase: "dialogo",
+      html: `<p>Marca los ejercicios que quieres eliminar de «${h(ses.nombre || "la sesión")}».</p>
+        <div class="lista-acc" id="q-lista">${ses.ejercicios.map((e, i) => `<label class="fila q-fila"><input type="checkbox" data-q="${i}"><span class="t"><b>${h(e.nombre || "Ejercicio")}</b></span></label>`).join("")}</div>`,
+      pie: `<button class="btn" data-cerrar>Cancelar</button><button class="btn peligro" id="q-ok" disabled>Eliminar</button>`,
+    });
+    const ok = $("#q-ok", hoja.el);
+    const marcados = () => $$("[data-q]:checked", hoja.el).map((x) => +x.dataset.q);
+    hoja.el.addEventListener("change", () => { const n = marcados().length; ok.disabled = !n; ok.textContent = n ? `Eliminar (${n})` : "Eliminar"; });
+    ok.addEventListener("click", () => {
+      const idx = marcados(); if (!idx.length) return;
+      ses.ejercicios = ses.ejercicios.filter((_, i) => !idx.includes(i));
+      tocarPlan(plan); hoja.cerrar(); UI.render(true); UI.aviso(idx.length === 1 ? "Ejercicio eliminado" : idx.length + " ejercicios eliminados");
+    });
+  }
+
   function menuSesion(plan, si) {
     const ses = plan.sesiones[si];
     UI.menu(ses.nombre || "Sesión", [
       { t: "Editar sesión", ic: "settings", f: () => editarSesionN(plan, si) },
+      ...(ses.ejercicios.length ? [{ t: "Quitar ejercicios…", ic: "trash", f: () => quitarEjercicios(plan, si) }] : []),
       { t: "Duplicar sesión", ic: "copy", f: () => duplicarSesion(plan, si) },
       ...(si > 0 ? [{ t: "Mover arriba", ic: "up", f: () => { [plan.sesiones[si - 1], plan.sesiones[si]] = [plan.sesiones[si], plan.sesiones[si - 1]]; tocarPlan(plan); UI.render(true); } }] : []),
       ...(si < plan.sesiones.length - 1 ? [{ t: "Mover abajo", ic: "down", f: () => { [plan.sesiones[si + 1], plan.sesiones[si]] = [plan.sesiones[si], plan.sesiones[si + 1]]; tocarPlan(plan); UI.render(true); } }] : []),

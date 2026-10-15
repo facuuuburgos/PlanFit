@@ -586,3 +586,18 @@ button.icono.chev { color: var(--txt2); }
   .lat-oculto .lateral { width: 0; opacity: 0; border-right-color: transparent; pointer-events: none; }
   .lat-oculto .btn-lateral { display: grid; animation: pop .35s var(--resorte); }
 }
+
+/* iconos en filas de menú, eliminar ejercicio, panel oculto = más espacio */
+.fila > svg { width: 22px; height: 22px; flex: none; color: var(--txt2); }
+.fila.peligro > svg { color: var(--peligro); }
+.del-ej { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 4px; padding: 8px; border: 0; background: none; color: var(--peligro); font-weight: 600; font-size: 13px; border-radius: 10px; }
+.del-ej svg { width: 16px; height: 16px; }
+.del-ej:active { background: color-mix(in srgb, var(--peligro) 12%, transparent); }
+.q-fila { cursor: pointer; }
+.q-fila input { width: 22px; height: 22px; accent-color: var(--peligro); flex: none; }
+@media (min-width: 900px) {
+  .lat-oculto .contenido, .lat-oculto .contenido.ancho { max-width: 1280px; }
+  .lat-oculto .contenido.amplio { max-width: none; padding-left: 28px; padding-right: 28px; }
+  .lat-oculto .dos-col { grid-template-columns: minmax(0, 1.3fr) minmax(460px, 1fr); gap: 28px; }
+  .lat-oculto .barra-sup { padding-left: 14px; padding-right: 28px; }
+}

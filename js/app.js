@@ -3,7 +3,7 @@
   "use strict";
 
   const UI = root.UI, PF = root.PF, D = root.PF_DATA, Store = PF.Store, h = UI.h, $ = UI.$, $$ = UI.$$;
-  UI.VERSION = "1.9.0";
+  UI.VERSION = "1.9.1";
   UI.lateralOculto = () => { try { return localStorage.getItem("planfit.lateralOculto") === "1"; } catch (e) { return false; } };
 
   const ancho = () => matchMedia("(min-width: 900px)").matches;
@@ -351,7 +351,7 @@
     },
 
     actualizar() { aplicarActualizacion(); },
-    lateral() { const v = !UI.lateralOculto(); try { localStorage.setItem("planfit.lateralOculto", v ? "1" : "0"); } catch (e) {} $("#app").classList.toggle("lat-oculto", v); },
+    lateral() { const v = !UI.lateralOculto(); try { localStorage.setItem("planfit.lateralOculto", v ? "1" : "0"); } catch (e) {} $("#app").classList.toggle("lat-oculto", v); UI.render(true); },
     "vista-ancha"(a) { Store.datos.entrenador.vistaAncha = a.dataset.v === "1"; Store.guardarYa(); UI.render(true); },
     async "buscar-act"() {
       if (!UI.reg) { UI.aviso("Las actualizaciones automáticas no están disponibles aquí"); return; }
