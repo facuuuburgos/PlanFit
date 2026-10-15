@@ -5,7 +5,7 @@
   const UI = root.UI, PF = root.PF, D = root.PF_DATA, Store = PF.Store, h = UI.h, $ = UI.$, $$ = UI.$$;
   const V = (UI.vistas = {});
 
-  UI.estado = { tab: "sesiones", semanaVista: {}, pdf: { alcance: "semana", desde: 1, hasta: 4, semana: null }, busqueda: "" };
+  UI.estado = { abierto: {}, vista: (() => { try { return localStorage.getItem("planfit.vista") || "compacta"; } catch (e) { return "compacta"; } })(), tab: "sesiones", semanaVista: {}, pdf: { alcance: "semana", desde: 1, hasta: 4, semana: null }, busqueda: "" };
 
   // Pantalla grande (iPad horizontal / computadora): distribución en dos columnas
   UI.amplia = () => matchMedia("(min-width: 1100px)").matches && Store.datos.entrenador.vistaAncha !== false;
@@ -332,37 +332,61 @@
       return `<button data-w="${i + 1}" class="${i + 1 === w ? "on" : ""} ${i + 1 === hoy ? "hoy" : ""}" style="background:${f ? f.fase.color : "#8A93A6"}" aria-label="Semana ${i + 1}">${i + 1}</button>`;
     }).join("");
 
+    // vista: "detalle" (todo abierto) · "compacta" (ejercicios en una línea) · "dias" (solo los días, cerrados)
+    const vista = UI.estado.vista || "compacta";
+    const ab = UI.estado.abierto;
+    const sesAbierta = (s) => (ab["s:" + s.id] !== undefined ? ab["s:" + s.id] : vista !== "dias");
+    const ejAbierto = (e) => (ab["e:" + e.id] !== undefined ? ab["e:" + e.id] : vista === "detalle");
+    const resumenEj = (e) => {
+      const c = e.sem[w - 1], kg = plan.opciones.kg ? PF.kgDe(e, w) : null;
+      const pc = PF.num(c.i);
+      return [`${c.s}×${c.r === "" || c.r == null ? "–" : c.r}`, c.d ? `${c.d}"` : "", pc ? `${String(pc).replace(".", ",")}%` : "", kg ? `${kg} kg` : ""].filter(Boolean).join(" · ");
+    };
+
     const sesiones = plan.sesiones.map((s, si) => {
-      const total = s.ejercicios.reduce((a, e) => a + (+e.sem[w - 1].s || 0), 0);
+      const vis = s.ejercicios.map((e, ei) => ({ e, ei })).filter((x) => PF.activo(x.e, w));
+      const total = vis.reduce((a, x) => a + (+x.e.sem[w - 1].s || 0), 0);
       const dia = s.dia ? s.dia.slice(0, 3).toUpperCase() : "";
-      return `<section class="sesion" data-ses="${si}">
+      const abierta = sesAbierta(s);
+      return `<section class="sesion ${abierta ? "" : "cerrada"}" data-ses="${si}">
         <div class="sesion-cab">
           ${dia ? `<span class="dia">${h(dia)}</span>` : ""}
-          <button class="t" data-edit-ses="${si}" style="border:0;background:none;text-align:left;padding:0"><b>${h(s.nombre || "Sesión " + (si + 1))}</b><span data-resumen="${si}">${s.ejercicios.length} ejercicios · ${total} series${s.foco ? " · " + h(s.foco) : ""}</span></button>
+          <button class="t" data-tog-ses="${s.id}" style="border:0;background:none;text-align:left;padding:0" aria-expanded="${abierta}"><b>${h(s.nombre || "Sesión " + (si + 1))}</b><span data-resumen="${si}">${vis.length} ${vis.length === 1 ? "ejercicio" : "ejercicios"} · ${total} series${s.foco ? " · " + h(s.foco) : ""}</span></button>
           <button class="icono" data-menu-ses="${si}" aria-label="Opciones de la sesión">${UI.ic("dots")}</button>
+          <button class="icono chev ${abierta ? "abierta" : ""}" data-tog-ses="${s.id}" aria-label="${abierta ? "Contraer" : "Expandir"}">${UI.ic("down")}</button>
         </div>
-        ${s.ejercicios.map((e, ei) => {
+        ${abierta ? `
+        ${vis.map(({ e, ei }, k) => {
           const c = e.sem[w - 1];
           const kg = plan.opciones.kg ? PF.kgDe(e, w) : null;
-          return `<div class="ej" data-ej="${e.id}" data-si="${si}" data-ei="${ei}">
+          const abierto = ejAbierto(e);
+          const parcial = e.act ? `Sem. ${PF.textoSemanas(PF.semanasActivas(e, plan.semanas))}` : "";
+          const nota = [parcial, e.tempo ? "Tempo " + h(e.tempo) : "", e.rm ? "Máx. " + h(e.rm) + " kg" : "", e.nota ? h(e.nota) : ""].filter(Boolean).join(" · ");
+          return `<div class="ej ${abierto ? "" : "compacto"}" data-ej="${e.id}" data-si="${si}" data-ei="${ei}">
             <div class="ej-cab">
+              ${vis.length > 1 ? `<button class="grip" data-grip aria-label="Mantén y arrastra para reordenar">${UI.ic("grip")}</button>` : ""}
               ${e.super ? `<span class="et">${h(e.super)}</span>` : ""}
-              <button class="nombre" data-edit-ej="${si}:${ei}">${h(e.nombre)}<span class="nota">${[e.tempo ? "Tempo " + h(e.tempo) : "", e.rm ? "Máx. " + h(e.rm) + " kg" : "", e.nota ? h(e.nota) : ""].filter(Boolean).join(" · ") || "&nbsp;"}</span></button>
-              <button class="icono gris" data-mov-ej="${si}:${ei}:-1" aria-label="Subir" ${ei === 0 ? "disabled" : ""} style="width:34px;height:34px">${UI.ic("up")}</button>
-              <button class="icono gris" data-mov-ej="${si}:${ei}:1" aria-label="Bajar" ${ei === s.ejercicios.length - 1 ? "disabled" : ""} style="width:34px;height:34px">${UI.ic("down")}</button>
+              <button class="nombre" data-edit-ej="${si}:${ei}">${h(e.nombre)}${abierto || nota ? `<span class="nota">${nota || "&nbsp;"}</span>` : ""}</button>
+              <button class="resumen-ej" data-tog-ej="${e.id}" aria-expanded="${abierto}" aria-label="${abierto ? "Contraer" : "Ver detalles"}">${abierto ? "" : `<span data-sum>${h(resumenEj(e))}</span>`}<span class="chev ${abierto ? "abierta" : ""}">${UI.ic("down")}</span></button>
             </div>
-            <div class="vals" style="grid-template-columns:repeat(${cols},1fr)">
+            ${abierto ? `<div class="vals" style="grid-template-columns:repeat(${cols},1fr)">
               <label><span>Series</span><input data-c="s" inputmode="numeric" value="${h(c.s)}"></label>
               <label><span>Reps</span><input data-c="r" value="${h(c.r)}"></label>
               <label><span>Desc. s</span><input data-c="d" inputmode="numeric" value="${h(c.d)}"></label>
               <label><span>%</span><input data-c="i" inputmode="decimal" value="${h(c.i ?? "")}" placeholder="–"><div class="kg" data-kg>${kg ? kg + " kg" : "&nbsp;"}</div></label>
               ${rpe ? `<label><span>RPE</span><input data-c="rpe" inputmode="decimal" value="${h(c.rpe ?? "")}" placeholder="–"></label>` : ""}
-            </div>
+            </div>` : ""}
           </div>`;
         }).join("")}
-        <button class="add-ej" data-add-ej="${si}">${UI.ic("plus")}Añadir ejercicio</button>
+        ${vis.length ? "" : `<p class="ayuda" style="padding:4px 16px 8px;margin:0">Sin ejercicios en la semana ${w}.</p>`}
+        <button class="add-ej" data-add-ej="${si}">${UI.ic("plus")}Añadir ejercicio</button>` : ""}
       </section>`;
     }).join("");
+
+    const barraVista = plan.sesiones.length ? `
+        <div class="seg barra-vista" role="group" aria-label="Vista de la lista">
+          ${[["detalle", "Detalle"], ["compacta", "Compacta"], ["dias", "Solo días"]].map(([k, t]) => `<button data-vista="${k}" class="${vista === k ? "on" : ""}">${t}</button>`).join("")}
+        </div>` : "";
 
     return {
       html: `
@@ -378,6 +402,7 @@
         </div>
         <details ${plan.semInfo[w - 1].nota ? "open" : ""} style="margin-bottom:14px"><summary class="peq muted" style="cursor:pointer;padding:4px 2px">Nota para esta semana (sale en el PDF)</summary>
           <textarea class="entrada" id="nota-sem" style="margin-top:6px;min-height:70px" placeholder="Ej.: Semana de adaptación, prioriza la técnica">${h(plan.semInfo[w - 1].nota)}</textarea></details>
+        ${barraVista}
         ${plan.sesiones.length ? sesiones : `<div class="vacio"><div class="ic">${UI.ic("dumbbell")}</div><h2>Crea la primera sesión</h2><p>Una sesión es un día de entrenamiento (por ejemplo «Día 1 · Pierna»). Después añades los ejercicios.</p></div>`}
         <button class="btn ${plan.sesiones.length ? "" : "primario"} bloque" data-act="nueva-sesion">${UI.ic("plus")}Añadir sesión</button>
         ${plan.sesiones.length ? `<p class="ayuda" style="margin-top:12px;text-align:center">Edita aquí los valores de la semana ${w}. Toca el nombre de un ejercicio para cambiar su evolución semana a semana.</p>` : ""}`,
@@ -399,31 +424,139 @@
           if (k === "s" || k === "d") c[k] = inp.value === "" ? 0 : Math.max(0, Math.round(PF.num(inp.value) ?? 0));
           else if (k === "i") { c.i = PF.num(inp.value); const kg = $("[data-kg]", fila); if (kg) { const v = plan.opciones.kg ? PF.kgDe(ej, w) : null; kg.innerHTML = v ? v + " kg" : "&nbsp;"; } }
           else c[k] = inp.value;
-          if (k === "s") { const s = plan.sesiones[si]; const t = s.ejercicios.reduce((a, x) => a + (+x.sem[w - 1].s || 0), 0); $(`[data-resumen="${si}"]`, el).textContent = `${s.ejercicios.length} ejercicios · ${t} series${s.foco ? " · " + s.foco : ""}`; }
+          if (k === "s") { const s = plan.sesiones[si]; const act = s.ejercicios.filter((x) => PF.activo(x, w)); const t = act.reduce((a, x) => a + (+x.sem[w - 1].s || 0), 0); $(`[data-resumen="${si}"]`, el).textContent = `${act.length} ${act.length === 1 ? "ejercicio" : "ejercicios"} · ${t} series${s.foco ? " · " + s.foco : ""}`; }
           tocarPlan(plan);
         });
 
         $$("[data-edit-ej]", el).forEach((b) => b.addEventListener("click", () => {
           const [si, ei] = b.dataset.editEj.split(":").map(Number);
           const ses = plan.sesiones[si];
-          UI.editarEjercicio(plan, ses.ejercicios[ei], (ej) => { ses.ejercicios[ei] = ej; tocarPlan(plan); UI.render(true); }, () => { ses.ejercicios.splice(ei, 1); tocarPlan(plan); UI.render(true); });
+          UI.editarEjercicio(plan, ses.ejercicios[ei], (ej) => { ses.ejercicios[ei] = ej; tocarPlan(plan); UI.render(true); }, () => { ses.ejercicios.splice(ei, 1); tocarPlan(plan); UI.render(true); }, { semana: w },
+            (nuevoEj, quedan) => {
+              const viejo = ses.ejercicios[ei];
+              if (quedan.length) { PF.ponerActivas(viejo, plan.semanas, quedan); ses.ejercicios.splice(ei + 1, 0, nuevoEj); }
+              else ses.ejercicios[ei] = nuevoEj;
+              tocarPlan(plan); UI.render(true); UI.aviso("Ejercicio cambiado");
+            });
         }));
 
+        activarArrastre(el, plan, w);
+
         $$("[data-mov-ej]", el).forEach((b) => b.addEventListener("click", () => {
-          const [si, ei, d] = b.dataset.movEj.split(":").map(Number), l = plan.sesiones[si].ejercicios, j = ei + d;
+          const [si, ei, d] = b.dataset.movEj.split(":").map(Number), l = plan.sesiones[si].ejercicios;
+          let j = ei + d;
+          while (j >= 0 && j < l.length && !PF.activo(l[j], w)) j += d;   // salta los ejercicios que no aparecen esta semana
           if (j < 0 || j >= l.length) return;
           [l[ei], l[j]] = [l[j], l[ei]]; tocarPlan(plan); UI.render(true);
         }));
 
         $$("[data-add-ej]", el).forEach((b) => b.addEventListener("click", () => {
           const ses = plan.sesiones[+b.dataset.addEj];
-          UI.editarEjercicio(plan, null, (ej) => { ses.ejercicios.push(ej); tocarPlan(plan); UI.render(true); });
+          UI.editarEjercicio(plan, null, (ej) => { ses.ejercicios.push(ej); tocarPlan(plan); UI.render(true); }, null, { semana: w });
+        }));
+
+        // vista compacta / detalle y abrir-cerrar
+        $$("[data-vista]", el).forEach((b) => b.addEventListener("click", () => {
+          UI.estado.vista = b.dataset.vista; UI.estado.abierto = {};
+          try { localStorage.setItem("planfit.vista", UI.estado.vista); } catch (e) { /* nada */ }
+          UI.render(true);
+        }));
+        $$("[data-tog-ses]", el).forEach((b) => b.addEventListener("click", () => {
+          const id = b.dataset.togSes, s = plan.sesiones.find((x) => x.id === id);
+          if (s) { UI.estado.abierto["s:" + id] = !sesAbierta(s); UI.render(true); }
+        }));
+        $$("[data-tog-ej]", el).forEach((b) => b.addEventListener("click", () => {
+          const id = b.dataset.togEj, e = plan.sesiones.flatMap((s) => s.ejercicios).find((x) => x.id === id);
+          if (e) { UI.estado.abierto["e:" + id] = !ejAbierto(e); UI.render(true); }
         }));
 
         $$("[data-edit-ses]", el).forEach((b) => b.addEventListener("click", () => editarSesionN(plan, +b.dataset.editSes)));
         $$("[data-menu-ses]", el).forEach((b) => b.addEventListener("click", () => menuSesion(plan, +b.dataset.menuSes)));
       },
     };
+  }
+
+  /* ---------- reordenar ejercicios arrastrando ---------- */
+
+  function activarArrastre(el, plan, w) {
+    const contenedorScroll = () => {
+      const pr = $(".principal");
+      if (pr && pr.scrollHeight > pr.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(pr).overflowY)) return pr;
+      return document.scrollingElement;
+    };
+
+    el.addEventListener("pointerdown", (ev) => {
+      const grip = ev.target.closest("[data-grip]");
+      if (!grip || (ev.pointerType === "mouse" && ev.button !== 0)) return;
+      const fila = grip.closest(".ej"), sec = fila.closest(".sesion");
+      const filas = $$(".ej", sec);
+      const k = filas.indexOf(fila);
+      if (k < 0 || filas.length < 2) return;
+      ev.preventDefault();
+
+      const sc = contenedorScroll();
+      const centros = filas.map((f) => { const r = f.getBoundingClientRect(); return r.top + r.height / 2; });
+      const alto = fila.getBoundingClientRect().height;
+      const y0 = ev.clientY, sc0 = sc.scrollTop;
+      let yAct = ev.clientY, nuevo = k, activo = true, raf = 0;
+
+      try { grip.setPointerCapture(ev.pointerId); } catch (e) { /* nada */ }
+      fila.classList.add("arrastrando"); sec.classList.add("ordenando");
+      filas.forEach((f) => { if (f !== fila) f.classList.add("mueve"); });
+
+      const aplicar = () => {
+        const dy = yAct - y0 + (sc.scrollTop - sc0);
+        fila.style.transform = `translateY(${dy}px)`;
+        const centro = centros[k] + dy;
+        let n = 0;
+        centros.forEach((c, i) => { if (i !== k && c < centro) n++; });
+        nuevo = n;
+        filas.forEach((f, i) => {
+          if (i === k) return;
+          let t = 0;
+          if (k < nuevo && i > k && i <= nuevo) t = -alto;
+          else if (k > nuevo && i >= nuevo && i < k) t = alto;
+          f.style.transform = t ? `translateY(${t}px)` : "";
+        });
+      };
+
+      const autoscroll = () => {
+        if (!activo) return;
+        const borde = 80, h = innerHeight;
+        let v = 0;
+        if (yAct < borde + 60) v = -Math.ceil((borde + 60 - yAct) / 6);
+        else if (yAct > h - borde - 60) v = Math.ceil((yAct - (h - borde - 60)) / 6);
+        if (v) { sc.scrollTop += Math.max(-18, Math.min(18, v)); aplicar(); }
+        raf = requestAnimationFrame(autoscroll);
+      };
+      raf = requestAnimationFrame(autoscroll);
+
+      const mover = (e) => { yAct = e.clientY; aplicar(); };
+      const terminar = (e, cancelar) => {
+        activo = false; cancelAnimationFrame(raf);
+        grip.removeEventListener("pointermove", mover);
+        grip.removeEventListener("pointerup", fin);
+        grip.removeEventListener("pointercancel", cancel);
+        try { grip.releasePointerCapture(ev.pointerId); } catch (x) { /* nada */ }
+        if (cancelar || nuevo === k) {
+          fila.classList.remove("arrastrando"); sec.classList.remove("ordenando");
+          filas.forEach((f) => { f.classList.remove("mueve"); f.style.transform = ""; });
+          return;
+        }
+        // reordena los datos: solo se mueven los ejercicios visibles; los que no aparecen esta semana conservan su sitio
+        const ses = plan.sesiones[+sec.dataset.ses], l = ses.ejercicios;
+        const idx = [];
+        l.forEach((x, i) => { if (PF.activo(x, w)) idx.push(i); });
+        const orden = idx.map((i) => l[i]);
+        const [m] = orden.splice(k, 1); orden.splice(nuevo, 0, m);
+        idx.forEach((i, j) => { l[i] = orden[j]; });
+        tocarPlan(plan); UI.render(true);
+      };
+      const fin = (e) => terminar(e, false), cancel = (e) => terminar(e, true);
+      grip.addEventListener("pointermove", mover);
+      grip.addEventListener("pointerup", fin);
+      grip.addEventListener("pointercancel", cancel);
+    });
   }
 
   function editarSesionN(plan, si) {

@@ -475,7 +475,11 @@
       return y + 22;
     }
 
-    function sesion(ses, idxSesion, w, color) {
+    function sesion(sesCompleta, idxSesion, w, color) {
+      // solo los ejercicios que aparecen en esta semana; si la sesión no tiene ninguno, no se imprime
+      const ejsSemana = sesCompleta.ejercicios.filter((e) => PF.activo(e, w));
+      if (!ejsSemana.length) return;
+      const ses = Object.assign({}, sesCompleta, { ejercicios: ejsSemana });
       const cols = columnas();
       const total = ses.ejercicios.reduce((a, e) => a + (+((e.sem[w - 1] || {}).s) || 0), 0);
 
@@ -501,7 +505,7 @@
       while (nombre.length > 3 && p.medir(nombre, 11.5, "b", 1.2) > maxN) nombre = nombre.slice(0, -1);
       p.text(nombre, tx, y + 12, { size: 11.5, font: "b", color: TINTA, spacing: 1.2 });
       if (ses.foco) p.text(ses.foco, M + 16, y + 31, { size: 8.5, color: oscuro(color, 0.55) });
-      p.text(`${ses.ejercicios.length} ejercicios`, PW - M - 16, y + 11, { size: 8, color: oscuro(color, 0.55), align: "right" });
+      p.text(`${ses.ejercicios.length} ${ses.ejercicios.length === 1 ? "ejercicio" : "ejercicios"}`, PW - M - 16, y + 11, { size: 8, color: oscuro(color, 0.55), align: "right" });
       p.text(`${total} series`, PW - M - 16, y + 23, { size: 8, color: oscuro(color, 0.55), align: "right" });
       if (calTxt) p.bloque(calTxt, M + 16, y + base - 2, CW - 150, { size: 8.5, color: oscuro(color, 0.55), lh: 11.5 });
       y += hHead + 8;
@@ -550,12 +554,15 @@
       S.y = y;
 
       plan.sesiones.forEach((ses, si) => {
-        if (!ses.ejercicios.length) return;
+        const lista = ses.ejercicios.filter((e) => semanas.some((w) => PF.activo(e, w)));
+        if (!lista.length) return;
         const porBloque = 6;
 
         for (let b = 0; b < semanas.length; b += porBloque) {
           const bloque = semanas.slice(b, b + porBloque);
           const nameW = 150, cw = (CW - nameW) / porBloque;
+          const listaB = lista.filter((e) => bloque.some((w) => PF.activo(e, w)));
+          if (!listaB.length) continue;
 
           asegurar(120, "EVOLUCIÓN DEL PLAN");
           let p = S.p, yy = S.y;
@@ -582,7 +589,7 @@
 
           yy = cabecera(p, yy);
 
-          ses.ejercicios.forEach((e, k) => {
+          listaB.forEach((e, k) => {
             const hNom = p.alturaBloque(e.nombre || "Ejercicio", nameW - 14, 9, "b", 11.5, 2);
             const h = Math.max(32, hNom + 12);
 
@@ -599,7 +606,8 @@
               const c = e.sem[w - 1];
               if (!c) return;
               const x = M + nameW + i * cw + cw / 2;
-              const prev = e.sem[w - 2];
+              if (!PF.activo(e, w)) { p.text("—", x, yy + h / 2 - 5, { size: 9, color: "#CFCBC2", align: "center" }); return; }
+              const prev = PF.activo(e, w - 1) ? e.sem[w - 2] : null;   // si el ejercicio recién aparece, no se marca como cambio
               const cambio = (campo) => prev && String(prev[campo] ?? "") !== String(c[campo] ?? "") && w !== semanas[0];
               const l1 = fmtSR(c);
               const cambia1 = cambio("s") || cambio("r");

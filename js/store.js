@@ -63,6 +63,23 @@
 
   PF.semanaVacia = () => ({ s: 3, r: "10", d: 60, i: null, rpe: "" });
 
+  /* ---------- semanas en las que aparece un ejercicio ----------
+     ej.act = lista de true/false (una por semana). Si no existe, el ejercicio aparece en todas las semanas. */
+  PF.activo = (e, w) => !e.act || e.act[w - 1] !== false;
+  PF.semanasActivas = (e, n) => { const l = []; for (let w = 1; w <= n; w++) if (PF.activo(e, w)) l.push(w); return l; };
+  PF.ponerActivas = (e, n, lista) => {
+    const set = new Set(lista);
+    const act = Array.from({ length: n }, (_, i) => set.has(i + 1));
+    if (act.every(Boolean)) delete e.act; else e.act = act;
+  };
+  PF.ponerActivo = (e, n, w, valor) => { const l = PF.semanasActivas(e, n).filter((x) => x !== w); if (valor) l.push(w); PF.ponerActivas(e, n, l); };
+  // [1,2,3,4,9] -> "1–4, 9"
+  PF.textoSemanas = (lista) => {
+    const l = [...lista].sort((a, b) => a - b), out = [];
+    for (let i = 0; i < l.length;) { let j = i; while (j + 1 < l.length && l[j + 1] === l[j] + 1) j++; out.push(j > i ? `${l[i]}–${l[j]}` : `${l[i]}`); i = j + 1; }
+    return out.join(", ");
+  };
+
   PF.nuevoEjercicio = (nombre = "", semanas = 1, base = null) => {
     const ej = { id: PF.id(), nombre, grupo: "", nota: "", tempo: "", rm: null, super: "", sem: [] };
     for (let i = 0; i < semanas; i++) ej.sem.push(base ? { ...base } : PF.semanaVacia());
@@ -102,6 +119,11 @@
       for (const e of s.ejercicios) {
         while (e.sem.length < plan.semanas) e.sem.push({ ...(e.sem[e.sem.length - 1] || PF.semanaVacia()) });
         e.sem.length = plan.semanas;
+        if (Array.isArray(e.act)) {
+          while (e.act.length < plan.semanas) e.act.push(e.act.length ? e.act[e.act.length - 1] : true);
+          e.act.length = plan.semanas;
+          if (e.act.every((x) => x !== false)) delete e.act;
+        } else delete e.act;
       }
     }
 
@@ -166,7 +188,7 @@
     for (const s of plan.sesiones) {
       for (const e of s.ejercicios) {
         const c = e.sem[w - 1];
-        if (!c) continue;
+        if (!c || !PF.activo(e, w)) continue;
         ejercicios++;
         series += Math.max(0, +c.s || 0);
         const i = PF.num(c.i);
@@ -200,6 +222,7 @@
     for (let w = desde; w <= hasta && w <= ej.sem.length; w++) {
       const k = (w - desde) * paso;
       const c = ej.sem[w - 1];
+      if (!PF.activo(ej, w)) continue;
 
       if (campo === "r") c.r = sumarValor(inicio, k);
       else if (campo === "rpe") c.rpe = sumarValor(inicio, k);
@@ -215,14 +238,19 @@
   };
 
   PF.copiarSemana = (plan, de, a) => {
-    for (const s of plan.sesiones) for (const e of s.ejercicios) e.sem[a - 1] = { ...e.sem[de - 1] };
+    for (const s of plan.sesiones) for (const e of s.ejercicios) {
+      const act = PF.activo(e, de);
+      PF.ponerActivo(e, plan.semanas, a, act);
+      if (act) e.sem[a - 1] = { ...e.sem[de - 1] };
+    }
     plan.semInfo[a - 1] = { ...plan.semInfo[de - 1] };
   };
 
   PF.aplicarDescarga = (plan, w, factorSeries = 0.6, factorInt = 0.85) => {
     for (const s of plan.sesiones) {
       for (const e of s.ejercicios) {
-        const prev = e.sem[Math.max(0, w - 2)];
+        if (!PF.activo(e, w)) continue;
+        const prev = (w > 1 && PF.activo(e, w - 1)) ? e.sem[w - 2] : e.sem[w - 1];
         const c = e.sem[w - 1];
         c.s = Math.max(1, Math.round((+prev.s || 1) * factorSeries));
         c.r = prev.r;

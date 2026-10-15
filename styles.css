@@ -420,3 +420,39 @@ body {
   .col-der-tabs { position: sticky; top: 0; z-index: 5; margin-bottom: 4px; box-shadow: 0 0 0 6px var(--bg); }
   .col-izq > .titulo-sec:first-child, .col-der > .tarjeta:first-of-type { margin-top: 8px; }
 }
+
+/* ---------- vista compacta / detalle ---------- */
+.barra-vista { margin: 0 0 12px; }
+.barra-vista button { min-height: 34px; font-size: 13px; }
+.chev svg { width: 20px; height: 20px; transition: transform .35s var(--resorte); display: block; }
+.chev.abierta svg { transform: rotate(180deg); }
+button.icono.chev { color: var(--txt2); }
+.sesion.cerrada { margin-bottom: 8px; }
+.sesion.cerrada .sesion-cab { background: var(--card); }
+.sesion-cab .t { cursor: pointer; }
+.ej.compacto { padding-top: 8px; padding-bottom: 8px; }
+.ej.compacto .ej-cab { margin-bottom: 0; }
+.ej.compacto button.nombre { font-size: 15px; font-weight: 600; overflow: hidden; }
+.ej.compacto button.nombre > .nota { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ej-cab .resumen-ej { display: flex; align-items: center; gap: 4px; flex: none; max-width: 52%; border: 0; background: var(--relleno); border-radius: 10px; padding: 6px 6px 6px 10px; min-height: 34px; color: var(--txt2); font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ej-cab .resumen-ej [data-sum] { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ej-cab .resumen-ej:active { transform: scale(.96); }
+.ej:not(.compacto) .resumen-ej { background: transparent; padding: 6px; }
+.ej.compacto .ej-cab button.nombre { flex: 1 1 0; }
+
+/* ---------- semanas en las que aparece un ejercicio ---------- */
+.act-strip { display: flex; flex-wrap: wrap; gap: 4px; margin: 10px 0 4px; }
+.act-strip button { width: 30px; height: 30px; border-radius: 8px; border: 1.5px solid var(--c); background: transparent; color: var(--txt2); font-size: 11.5px; font-weight: 700; padding: 0; transition: transform .25s var(--resorte), background .15s; }
+.act-strip button.on { background: var(--c); color: #fff; }
+.act-strip button.ref { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--txt3); }
+.act-strip button:active { transform: scale(.88); }
+
+/* ---------- asa para reordenar ---------- */
+.ej-cab .grip { flex: none; width: 30px; height: 36px; margin-left: -8px; border: 0; background: none; color: var(--txt3); display: grid; place-items: center; touch-action: none; cursor: grab; border-radius: 8px; -webkit-user-select: none; user-select: none; }
+.ej-cab .grip svg { width: 20px; height: 20px; }
+.ej-cab .grip:active, .ej.arrastrando .grip { color: var(--acento); cursor: grabbing; }
+.sesion.ordenando { user-select: none; -webkit-user-select: none; }
+.sesion.ordenando .ej.mueve { transition: transform .22s var(--suave); }
+.ej.arrastrando { position: relative; z-index: 30; background: var(--card); box-shadow: 0 14px 34px -8px rgba(12,17,34,.38); border-radius: 14px; border-top-color: transparent; transition: box-shadow .2s; scale: 1.02; pointer-events: none; }
+.ej.arrastrando .grip { pointer-events: auto; }
+.sesion.ordenando { overflow: visible; }

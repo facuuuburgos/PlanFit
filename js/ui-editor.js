@@ -33,15 +33,22 @@
   /* ============ EJERCICIO ============ */
 
   // existente: ejercicio a editar (se trabaja sobre una copia) o null para crear. alGuardar(ej)
-  UI.editarEjercicio = (plan, existente, alGuardar, alEliminar) => {
+  // ctx.semana = semana que se está viendo; alReemplazar(nuevoEj, quitarViejo) se usa al «Cambiar por otro ejercicio».
+  UI.editarEjercicio = (plan, existente, alGuardar, alEliminar, ctx = {}, alReemplazar) => {
     const borrador = existente ? JSON.parse(JSON.stringify(existente)) : PF.nuevoEjercicio("", plan.semanas);
     const nuevo = !existente;
     const n = plan.semanas;
+    const wRef = Math.max(1, Math.min(n, ctx.semana || 1));
+    const rangoFase = (w) => { const f = PF.faseDeSemana(plan, w); return f ? { d: f.desde, h: f.hasta } : { d: 1, h: n }; };
+    const rango = (d, hh) => Array.from({ length: hh - d + 1 }, (_, i) => d + i);
+    // un ejercicio nuevo aparece desde la semana que se está viendo hasta el final (desde la semana 1 = todo el plan)
+    if (nuevo && wRef > 1) PF.ponerActivas(borrador, n, rango(wRef, n));
     const rpe = plan.opciones.rpe;
 
     const filas = () => {
       let out = "";
       for (let w = 1; w <= n; w++) {
+        if (!PF.activo(borrador, w)) continue;
         const c = borrador.sem[w - 1];
         const f = PF.faseDeSemana(plan, w);
         const desc = plan.semInfo[w - 1] && plan.semInfo[w - 1].descarga;
@@ -71,6 +78,17 @@
       <p class="ayuda">«Máximo» es la repetición máxima del cliente en este ejercicio. Si la indicas, el PDF muestra los kilos aproximados según el %.</p>
       <label class="campo"><span>Nota para el cliente (opcional)</span><input id="e-nota" value="${h(borrador.nota)}" placeholder="Ej.: Controla la bajada, profundidad hasta paralelo"></label>
 
+      <div class="titulo-sec" style="margin-top:6px">¿En qué semanas aparece?
+        ${nuevo ? "" : `<span class="der"><button class="btn chico suave" id="e-cambiar">${UI.ic("swap")}Cambiar por otro</button></span>`}</div>
+      <div class="chips" id="e-q">
+        <button class="chip" data-q="todo">Todo el plan</button>
+        ${plan.fases.length > 1 ? `<button class="chip" data-q="fase">Solo esta fase</button>` : ""}
+        <button class="chip" data-q="desde">Desde la semana ${wRef}</button>
+        <button class="chip" data-q="solo">Solo la semana ${wRef}</button>
+      </div>
+      <div class="act-strip" id="e-act"></div>
+      <p class="ayuda" id="e-act-txt"></p>
+
       <div class="titulo-sec" style="margin-top:6px">Evolución semana a semana
         <span class="der"><button class="btn chico suave" id="e-prog">${UI.ic("wand")}Progresión rápida</button></span></div>
       <table class="tabla-sem">
@@ -89,6 +107,30 @@
     const el = hoja.el;
 
     const refrescarFilas = () => { $("#e-filas", el).innerHTML = filas(); };
+
+    /* semanas en las que aparece */
+    const pintarAct = () => {
+      $("#e-act", el).innerHTML = Array.from({ length: n }, (_, i) => {
+        const w = i + 1, f = PF.faseDeSemana(plan, w), on = PF.activo(borrador, w);
+        return `<button data-aw="${w}" class="${on ? "on" : ""} ${w === wRef ? "ref" : ""}" style="--c:${f ? f.fase.color : "#8A93A6"}" aria-pressed="${on}">${w}</button>`;
+      }).join("");
+      const l = PF.semanasActivas(borrador, n);
+      $("#e-act-txt", el).textContent = l.length === n ? "Aparece en todas las semanas del plan." : l.length ? `Aparece en: semanas ${PF.textoSemanas(l)}.` : "No aparece en ninguna semana: elige al menos una.";
+      refrescarFilas();
+    };
+    $("#e-act", el).addEventListener("click", (e) => {
+      const b = e.target.closest("[data-aw]"); if (!b) return;
+      const w = +b.dataset.aw; PF.ponerActivo(borrador, n, w, !PF.activo(borrador, w)); pintarAct();
+    });
+    $("#e-q", el).addEventListener("click", (e) => {
+      const b = e.target.closest("[data-q]"); if (!b) return;
+      const q = b.dataset.q, r = rangoFase(wRef);
+      PF.ponerActivas(borrador, n, q === "todo" ? rango(1, n) : q === "fase" ? rango(r.d, r.h) : q === "desde" ? rango(wRef, n) : [wRef]);
+      pintarAct();
+    });
+    const cam = $("#e-cambiar", el);
+    if (cam) cam.addEventListener("click", () => UI.reemplazarEjercicio(plan, borrador, wRef, (nuevoEj, quitarViejo) => { hoja.cerrar(); alReemplazar && alReemplazar(nuevoEj, quitarViejo, borrador); }));
+    pintarAct();
 
     /* sugerencias */
     const nom = $("#e-nombre", el);
@@ -144,11 +186,61 @@
     $("#e-ok", el).addEventListener("click", () => {
       borrador.nombre = borrador.nombre.trim();
       if (!borrador.nombre) { UI.aviso("Escribe el nombre del ejercicio", { error: true }); $("#e-nombre", el).focus(); return; }
+      if (!PF.semanasActivas(borrador, n).length) { UI.aviso("Elige al menos una semana en la que aparezca", { error: true }); return; }
       borrador.super = String(borrador.super || "").trim().toUpperCase();
       for (const c of borrador.sem) { if (c.s === "") c.s = 0; if (c.d === "") c.d = 0; }
       UI.recordarEjercicio(borrador.nombre);
       hoja.cerrar();
       alGuardar(borrador);
+    });
+  };
+
+  /* ============ CAMBIAR POR OTRO EJERCICIO ============ */
+
+  // Crea un ejercicio nuevo (con los mismos valores) para unas semanas y se las quita al actual.
+  UI.reemplazarEjercicio = (plan, ej, w, alAplicar) => {
+    const n = plan.semanas;
+    const fase = PF.faseDeSemana(plan, w);
+    const activas = PF.semanasActivas(ej, n);
+    const alcances = [
+      ["solo", `Solo la semana ${w}`, [w]],
+      ...(fase && plan.fases.length > 1 ? [["fase", `Esta fase (${fase.fase.nombre}, sem. ${fase.desde}–${fase.hasta})`, Array.from({ length: fase.hasta - fase.desde + 1 }, (_, i) => fase.desde + i)]] : []),
+      ["desde", `Desde la semana ${w} en adelante`, Array.from({ length: n - w + 1 }, (_, i) => w + i)],
+    ].map(([id, t, l]) => [id, t, l.filter((x) => activas.includes(x))]).filter(([, , l]) => l.length);
+    let sel = alcances.length > 1 ? alcances[1][0] : alcances[0] ? alcances[0][0] : "solo";
+
+    const hoja = UI.hoja({
+      titulo: "Cambiar por otro ejercicio", clase: "dialogo", fija: true,
+      html: `
+        <p>Reemplaza «${h(ej.nombre || "este ejercicio")}» por otro, conservando series, repeticiones e intensidad. El resto de las semanas queda como está.</p>
+        <label class="campo"><span>Nuevo ejercicio</span><input id="r-nombre" placeholder="Ej.: Sentadilla frontal" autocomplete="off" autocapitalize="sentences"></label>
+        <div id="r-sug"></div>
+        <div class="titulo-sec" style="margin-top:6px">¿Desde cuándo?</div>
+        <div class="lista-fases" id="r-alc">${alcances.map(([id, t, l]) => `<button class="fila-fase ${id === sel ? "on" : ""}" data-a="${id}"><span><b>${h(t)}</b><small>Semanas ${PF.textoSemanas(l)}</small></span></button>`).join("")}</div>`,
+      pie: `<button class="btn" data-cerrar>Cancelar</button><button class="btn primario" id="r-ok">Cambiar</button>`,
+      alAbrir: (hh) => setTimeout(() => $("#r-nombre", hh.el).focus(), 300),
+    });
+    const el = hoja.el, nom = $("#r-nombre", el);
+    nom.addEventListener("input", () => {
+      const sug = UI.sugerirEjercicios(nom.value);
+      $("#r-sug", el).innerHTML = sug.length ? `<div class="sugerencias">${sug.map((s, i) => `<button data-s="${i}">${h(s.n)}<small>${h(s.g)}</small></button>`).join("")}</div>` : "";
+      $("#r-sug", el).onclick = (e) => { const b = e.target.closest("[data-s]"); if (!b) return; nom.value = sug[+b.dataset.s].n; $("#r-sug", el).innerHTML = ""; };
+    });
+    $("#r-alc", el).addEventListener("click", (e) => {
+      const b = e.target.closest("[data-a]"); if (!b) return;
+      sel = b.dataset.a; $$("#r-alc .fila-fase", el).forEach((x) => x.classList.toggle("on", x === b));
+    });
+    $("#r-ok", el).addEventListener("click", () => {
+      const nombre = nom.value.trim();
+      if (!nombre) { UI.aviso("Escribe el nombre del nuevo ejercicio", { error: true }); nom.focus(); return; }
+      const semanas = (alcances.find((a) => a[0] === sel) || alcances[0])[2];
+      const nuevo = JSON.parse(JSON.stringify(ej));
+      nuevo.id = PF.id(); nuevo.nombre = nombre; nuevo.nota = ""; nuevo.tempo = ""; nuevo.rm = null; nuevo.super = ej.super || "";
+      PF.ponerActivas(nuevo, n, semanas);
+      const quedan = activas.filter((x) => !semanas.includes(x));
+      UI.recordarEjercicio(nombre);
+      hoja.cerrar();
+      alAplicar(nuevo, quedan);
     });
   };
 
