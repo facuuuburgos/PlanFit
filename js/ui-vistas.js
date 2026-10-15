@@ -7,7 +7,15 @@
 
   UI.estado = { tab: "sesiones", semanaVista: {}, pdf: { alcance: "semana", desde: 1, hasta: 4, semana: null }, busqueda: "" };
 
-  UI.anchoGrafica = () => { const m = $("#main"); const base = m ? m.clientWidth : Math.min(innerWidth - (innerWidth >= 900 ? 320 : 0), 1000); return Math.max(290, Math.min(900, base - 28 - 32)); };
+  // Pantalla grande (iPad horizontal / computadora): distribución en dos columnas
+  UI.amplia = () => matchMedia("(min-width: 1100px)").matches && Store.datos.entrenador.vistaAncha !== false;
+  UI.anchoGrafica = () => {
+    if (UI.amplia()) {
+      const total = Math.min(innerWidth - 320, 1500) - 28;
+      const der = Math.max(400, (total - 22) * 0.9 / 2.15);
+      return Math.max(320, Math.min(700, Math.round(der - 38)));
+    }
+ const m = $("#main"); const base = m ? m.clientWidth : Math.min(innerWidth - (innerWidth >= 900 ? 320 : 0), 1000); return Math.max(290, Math.min(900, base - 28 - 32)); };
 
   const nav = (ruta) => { location.hash = ruta; };
   UI.nav = nav;
@@ -107,10 +115,7 @@
           <label class="campo"><span>Notas privadas (no salen en el PDF)</span><textarea data-b="c:notas" placeholder="Horarios, preferencias, historial…">${h(c.notas)}</textarea></label>
         </div>`;
 
-    return {
-      titulo: c.nombre || "Nuevo cliente", sub: planes.length ? `${planes.length} ${planes.length === 1 ? "plan" : "planes"}` : "", atras: "#/",
-      acciones: `<button class="icono" data-act="menu-cliente" aria-label="Más opciones">${UI.ic("dots")}</button>`,
-      html: (planes.length ? "" : datosHtml) + `
+    const planesHtml = `
         <div class="titulo-sec">Planes
           <span class="der"><button class="btn chico suave" data-act="nuevo-plan">${UI.ic("plus")}Nuevo plan</button></span></div>
         ${planes.length ? planes.map((p) => {
@@ -118,8 +123,14 @@
           return `<a class="fila" href="#/p/${p.id}"><span class="avatar" style="background:${(p.fases[0] || {}).color || "var(--acento)"}">${UI.ic("trend")}</span>
             <span class="t"><b>${h(p.titulo)}</b><span>${h(faseTexto(p))}</span></span>
             <span class="pildora ${est === "en curso" ? "ok" : ""}">${est}</span>${UI.ic("right", "flecha")}</a>`;
-        }).join("") : `<div class="tarjeta" style="text-align:center;color:var(--txt2)">Este cliente todavía no tiene planes.<br><br><button class="btn primario" data-act="nuevo-plan">${UI.ic("plus")}Crear el primer plan</button></div>`}
-` + (planes.length ? datosHtml : ""),
+        }).join("") : `<div class="tarjeta" style="text-align:center;color:var(--txt2)">Este cliente todavía no tiene planes.<br><br><button class="btn primario" data-act="nuevo-plan">${UI.ic("plus")}Crear el primer plan</button></div>`}`;
+
+    return {
+      titulo: c.nombre || "Nuevo cliente", sub: planes.length ? `${planes.length} ${planes.length === 1 ? "plan" : "planes"}` : "", atras: "#/",
+      acciones: `<button class="icono" data-act="menu-cliente" aria-label="Más opciones">${UI.ic("dots")}</button>`,
+      html: UI.amplia()
+        ? `<div class="dos-col igual"><div>${datosHtml}</div><div>${planesHtml}</div></div>`
+        : (planes.length ? "" : datosHtml) + planesHtml + (planes.length ? datosHtml : ""),
       bind(el) {
         $$("[data-obj]", el).forEach((b) => b.addEventListener("click", () => {
           const t = $('[data-b="c:objetivos"]', el), v = b.dataset.obj;
@@ -142,6 +153,20 @@
     const cli = Store.cliente(plan.clienteId);
     UI.ctx = { cliente: cli, plan };
     const tab = UI.estado.tab;
+
+    if (UI.amplia()) {
+      const der = UI.estado.tabDer === "pdf" ? "pdf" : "plan";
+      const izq = tabSesiones(plan, cli);
+      const dr = der === "pdf" ? tabPDF(plan, cli) : tabPlan(plan, cli);
+      return {
+        titulo: plan.titulo || "Plan", sub: cli ? cli.nombre : "", atras: cli ? `#/c/${cli.id}` : "#/",
+        acciones: `<button class="icono" data-act="menu-plan" aria-label="Más opciones">${UI.ic("dots")}</button>`,
+        html: `<div class="dos-col">
+          <div class="col-izq">${izq.html}</div>
+          <div class="col-der"><div class="seg col-der-tabs">${[["plan", "Plan y gráfica"], ["pdf", "PDF"]].map(([k, t]) => `<button data-tab-der="${k}" class="${der === k ? "on" : ""}">${t}</button>`).join("")}</div>${dr.html}</div></div>`,
+        bind(el) { izq.bind && izq.bind(el); dr.bind && dr.bind(el); },
+      };
+    }
 
     const tabs = `<div class="tabs-plan"><div class="seg">
       ${[["plan", "Plan"], ["sesiones", "Sesiones"], ["pdf", "PDF"]].map(([k, t]) => `<button data-tab="${k}" class="${tab === k ? "on" : ""}">${t}</button>`).join("")}</div></div>`;
@@ -514,6 +539,15 @@
           ${campo("Web o Instagram (opcional)", "ent:web", ent.web, 'placeholder="www.tuweb.com"')}
           <div class="campo"><span>Color de tu marca</span>
             <div class="paleta" id="paleta">${["#2F6BFF", "#7C4DFF", "#F2603C", "#16A085", "#E5A00D", "#D6336C", "#1F9BD1", "#111827"].map((c) => `<button data-col="${c}" style="background:${c}" class="${ent.color.toLowerCase() === c.toLowerCase() ? "on" : ""}" aria-label="${c}"></button>`).join("")}</div></div>
+        </div>
+
+        <div class="titulo-sec">Pantalla grande</div>
+        <div class="tarjeta">
+          <div class="seg" style="margin-bottom:10px">
+            <button data-act="vista-ancha" data-v="1" class="${ent.vistaAncha !== false ? "on" : ""}">Aprovechar pantalla</button>
+            <button data-act="vista-ancha" data-v="0" class="${ent.vistaAncha === false ? "on" : ""}">Compacta</button>
+          </div>
+          <p class="ayuda" style="margin:0">En iPad horizontal o en computadora, muestra las sesiones a la izquierda y el plan, la gráfica y el PDF a la derecha, para editar sin cambiar de pestaña.</p>
         </div>
 
         <div class="titulo-sec">Copia de seguridad</div>

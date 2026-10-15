@@ -3,7 +3,7 @@
   "use strict";
 
   const UI = root.UI, PF = root.PF, D = root.PF_DATA, Store = PF.Store, h = UI.h, $ = UI.$, $$ = UI.$$;
-  UI.VERSION = "1.3.0";
+  UI.VERSION = "1.4.0";
 
   const ancho = () => matchMedia("(min-width: 900px)").matches;
 
@@ -55,7 +55,7 @@
         <div class="lat-pie"><a class="btn bloque ${r.n === "ajustes" ? "suave" : ""}" href="#/ajustes">${UI.ic("settings")}Ajustes</a></div>
       </aside>`;
 
-    const banner = UI.hayActualizacion ? `<div class="banner-act"><span>Hay una versión nueva de PlanFit</span><button data-act="actualizar">Actualizar</button></div>` : "";
+    const banner = "";
 
     const principal = `
       <div class="principal">
@@ -65,7 +65,7 @@
           <h1>${h(vista.titulo)}${vista.sub ? `<span class="sub">${h(vista.sub)}</span>` : ""}</h1>
           ${vista.acciones || ""}
         </header>
-        <main class="contenido ${r.n === "plan" ? "ancho" : ""}" id="main">${vista.html}</main>
+        <main class="contenido ${r.n === "plan" ? "ancho" : ""} ${UI.amplia() && (r.n === "plan" || r.n === "cliente") ? "amplio" : ""}" id="main">${vista.html}</main>
       </div>`;
 
     const tab = `
@@ -152,6 +152,9 @@
     const tab = e.target.closest("[data-tab]");
     if (tab) { UI.estado.tab = tab.dataset.tab; UI.render(true); document.scrollingElement.scrollTop = 0; return; }
 
+    const td = e.target.closest("[data-tab-der]");
+    if (td) { UI.estado.tabDer = td.dataset.tabDer; UI.render(true); return; }
+
     const a = e.target.closest("[data-act]");
     if (!a) return;
     const f = ACCIONES[a.dataset.act];
@@ -160,6 +163,7 @@
 
   window.addEventListener("hashchange", () => { UI.cerrarTodas(); UI.render(); });
   matchMedia("(min-width: 900px)").addEventListener("change", () => UI.render(true));
+  matchMedia("(min-width: 1100px)").addEventListener("change", () => UI.render(true));
 
   /* ============ acciones ============ */
 
@@ -322,6 +326,7 @@
     },
 
     actualizar() { aplicarActualizacion(); },
+    "vista-ancha"(a) { Store.datos.entrenador.vistaAncha = a.dataset.v === "1"; Store.guardarYa(); UI.render(true); },
     async "buscar-act"() {
       if (!UI.reg) { UI.aviso("Las actualizaciones automáticas no están disponibles aquí"); return; }
       try { await UI.reg.update(); } catch (e) { /* sin conexión */ }
@@ -391,12 +396,17 @@
   }
 
   function iniciarSW() {
+    UI.chequeo = Promise.resolve();
     if (!("serviceWorker" in navigator) || location.protocol === "file:") return;
+    // La pantalla de arranque espera (máx. 2,5 s) a saber si hay versión nueva, para actualizar sin que se note
+    let liberar = () => {};
+    UI.chequeo = new Promise((r) => { liberar = r; setTimeout(r, 2500); });
 
     navigator.serviceWorker.register("sw.js").then((reg) => {
       UI.reg = reg;
-      // Actualiza sola apenas es seguro (sin editar un campo, sin hojas abiertas ni PDF en curso).
-      // Si no es seguro, muestra el aviso y reintenta cada pocos segundos.
+      // Actualiza sola y en silencio: al abrir (con la pantalla de arranque todavía visible) o en cuanto sea seguro
+      // (sin editar un campo, sin ventanas abiertas ni PDF en curso). Sin carteles: al volver a cargar solo
+      // aparece una notita discreta que dice que se actualizó.
       const seguro = () => {
         const a = document.activeElement;
         const escribiendo = a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);
@@ -407,26 +417,28 @@
         if (!reg.waiting) { clearInterval(reintento); reintento = null; return; }
         if (seguro()) {
           clearInterval(reintento); reintento = null;
-          try { Store.guardarYa(); } catch (e) { /* nada */ }
-          UI.aviso("Actualizando PlanFit…");
-          setTimeout(aplicarActualizacion, 350);
+          try { Store.guardarYa(); localStorage.setItem("planfit.recienActualizada", "1"); } catch (e) { /* nada */ }
+          aplicarActualizacion();
         }
       };
       const avisar = () => {
         UI.hayActualizacion = true;
         intentar();
-        if (reg.waiting && !reintento) { UI.render(true); reintento = setInterval(intentar, 4000); }
+        if (reg.waiting && !reintento) reintento = setInterval(intentar, 4000);
       };
       if (reg.waiting && navigator.serviceWorker.controller) avisar();
       reg.addEventListener("updatefound", () => {
         const nuevo = reg.installing;
         if (!nuevo) return;
-        nuevo.addEventListener("statechange", () => { if (nuevo.state === "installed" && navigator.serviceWorker.controller) avisar(); });
+        nuevo.addEventListener("statechange", () => {
+          if (nuevo.state === "installed" && navigator.serviceWorker.controller) avisar();
+          else if (nuevo.state === "redundant") liberar();
+        });
       });
-      reg.update().catch(() => {});
+      reg.update().then(() => { if (!reg.installing && !reg.waiting) liberar(); }).catch(liberar);
       document.addEventListener("visibilitychange", () => { if (!document.hidden) reg.update().catch(() => {}); });
       setInterval(() => reg.update().catch(() => {}), 60 * 60 * 1000);
-    }).catch(() => {});
+    }).catch(() => liberar());
 
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (UI.recargarAlCambiar) { UI.recargarAlCambiar = false; location.reload(); }
@@ -453,7 +465,18 @@
 
   // quita la pantalla de arranque
   const arr = document.getElementById("arranque");
-  if (arr) setTimeout(() => { arr.classList.add("fuera"); setTimeout(() => arr.remove(), 600); }, 650);
+  Promise.all([new Promise((r) => setTimeout(r, 650)), UI.chequeo]).then(() => {
+    if (arr) { arr.classList.add("fuera"); setTimeout(() => arr.remove(), 600); }
+    // aviso muy discreto si la app acaba de actualizarse sola
+    let nota = false;
+    try { nota = localStorage.getItem("planfit.recienActualizada") === "1"; localStorage.removeItem("planfit.recienActualizada"); } catch (e) { /* nada */ }
+    if (nota) setTimeout(() => {
+      const n = document.createElement("div");
+      n.className = "nota-disc"; n.textContent = "Actualizada · v" + UI.VERSION;
+      document.body.appendChild(n);
+      setTimeout(() => n.remove(), 3800);
+    }, 700);
+  });
 
   // Pide almacenamiento persistente para que el sistema no borre los datos
   try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) { /* nada */ }

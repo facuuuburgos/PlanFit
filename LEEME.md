@@ -16,7 +16,7 @@ Abrí la URL en **Safari** → botón Compartir → **Agregar a pantalla de inic
 ## Actualizar la app
 1. En `sw.js` cambiá `VERSION` (ej. `"1.1.1"`) y en `js/app.js` cambiá `UI.VERSION` al mismo valor.
 2. Subí los archivos modificados a GitHub (reemplazan a los anteriores).
-3. Al abrir la app (o volver a ella) se actualiza sola en cuanto es seguro; si estás escribiendo o hay una ventana abierta, espera unos segundos.
+3. Al abrir la app se actualiza sola, sin preguntar; solo aparece una notita discreta "Actualizada · vX.Y.Z".
 
 ## Importante
 - Los datos se guardan **solo en el dispositivo**. Usá *Ajustes → Copia de seguridad* de vez en cuando.
