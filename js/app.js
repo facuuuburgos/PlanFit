@@ -3,7 +3,7 @@
   "use strict";
 
   const UI = root.UI, PF = root.PF, D = root.PF_DATA, Store = PF.Store, h = UI.h, $ = UI.$, $$ = UI.$$;
-  UI.VERSION = "1.0.0";
+  UI.VERSION = "1.1.0";
 
   const ancho = () => matchMedia("(min-width: 900px)").matches;
 
@@ -93,6 +93,15 @@
     const pr2 = $(".principal"); if (pr2) pr2.onscroll = marca;
 
     bindBuscar(activo);
+
+    // animación de entrada solo cuando cambia de pantalla (no en cada edición)
+    const clave = r.n + "|" + (r.id || "") + "|" + (r.n === "plan" ? UI.estado.tab : "");
+    if (clave !== UI.ultimaClave) {
+      UI.ultimaClave = clave;
+      const m = $("#main"), br = $("#barra");
+      $$(".fila", m).forEach((f, i) => f.style.setProperty("--n", Math.min(i, 12)));
+      if (m) { m.classList.add("entra"); br && br.classList.add("entra-barra"); clearTimeout(UI._tEntra); UI._tEntra = setTimeout(() => { m.classList.remove("entra"); br && br.classList.remove("entra-barra"); }, 1800); }
+    }
   };
 
   function bindBuscar(activo) {
@@ -405,6 +414,21 @@
   UI.aplicarColor(Store.datos.entrenador.color);
   UI.render();
   iniciarSW();
+
+  // sin zoom: ni doble toque, ni pellizco, ni ctrl+rueda
+  ["gesturestart", "gesturechange", "gestureend"].forEach((ev) => document.addEventListener(ev, (e) => e.preventDefault(), { passive: false }));
+  document.addEventListener("dblclick", (e) => e.preventDefault(), { passive: false });
+  let ultimoToque = 0;
+  document.addEventListener("touchend", (e) => {
+    const t = Date.now();
+    if (t - ultimoToque < 350 && !e.target.closest("input, textarea, select")) e.preventDefault();
+    ultimoToque = t;
+  }, { passive: false });
+  document.addEventListener("wheel", (e) => { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
+
+  // quita la pantalla de arranque
+  const arr = document.getElementById("arranque");
+  if (arr) setTimeout(() => { arr.classList.add("fuera"); setTimeout(() => arr.remove(), 600); }, 650);
 
   // Pide almacenamiento persistente para que el sistema no borre los datos
   try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) { /* nada */ }

@@ -51,12 +51,12 @@
         if (!c.series) return;
         const bw = Math.max(2, xw * 0.58), bh = (c.series / maxSeries) * altoG;
         const f = PF.faseDeSemana(plan, c.w);
-        o.push(`<rect x="${gx + (c.w - 0.5) * xw - bw / 2}" y="${yG + altoG - bh}" width="${bw}" height="${bh}" rx="${Math.min(3, bw / 3)}" fill="${f ? f.fase.color : "#8A93A6"}" opacity="${c.descarga ? 0.3 : 0.5}"/>`);
+        o.push(`<rect class="bv" style="--i:${c.w}" x="${gx + (c.w - 0.5) * xw - bw / 2}" y="${yG + altoG - bh}" width="${bw}" height="${bh}" rx="${Math.min(3, bw / 3)}" fill="${f ? f.fase.color : "#8A93A6"}" opacity="${c.descarga ? 0.3 : 0.5}"/>`);
       });
 
       if (hayInt) {
         const pts = curva.filter((c) => c.intensidad).map((c) => [gx + (c.w - 0.5) * xw, yG + altoG - (c.intensidad / maxInt) * altoG]);
-        o.push(`<polyline points="${pts.map((p) => p.join(",")).join(" ")}" fill="none" stroke="var(--txt)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>`);
+        o.push(`<polyline pathLength="1" points="${pts.map((p) => p.join(",")).join(" ")}" fill="none" stroke="var(--txt)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>`);
         const rp = n > 30 ? 1.6 : 3;
         pts.forEach((p) => o.push(`<circle cx="${p[0]}" cy="${p[1]}" r="${rp}" fill="var(--card)" stroke="var(--txt)" stroke-width="1.6"/>`));
       }
@@ -74,7 +74,7 @@
       const t = W < 420 ? `SEM. ${marcada} · AQUÍ` : `SEMANA ${marcada} · AQUÍ`;
       const tw = t.length * 6.6 + 20;
       const px = Math.max(4, Math.min(W - 4 - tw, mx - tw / 2));
-      o.push(`<rect x="${px}" y="2" width="${tw}" height="20" rx="10" fill="var(--txt)"/>`);
+      o.push(`<g class="aqui"><rect x="${px}" y="2" width="${tw}" height="20" rx="10" fill="var(--txt)"/></g>`);
       o.push(`<text x="${px + tw / 2}" y="16" text-anchor="middle" font-size="10" font-weight="800" letter-spacing=".5" fill="var(--card)">${t}</text>`);
       o.push(`<path d="M${mx - 5} 22 L${mx + 5} 22 L${mx} 29 Z" fill="var(--txt)"/>`);
     }

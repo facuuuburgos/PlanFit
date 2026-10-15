@@ -14,7 +14,7 @@ Funciona en iPhone, iPad y computadora, sin internet una vez instalada.
 Abrí la URL en **Safari** → botón Compartir → **Agregar a pantalla de inicio**.
 
 ## Actualizar la app
-1. En `sw.js` cambiá `VERSION` (ej. `"1.0.1"`) y en `js/app.js` cambiá `UI.VERSION` al mismo valor.
+1. En `sw.js` cambiá `VERSION` (ej. `"1.1.1"`) y en `js/app.js` cambiá `UI.VERSION` al mismo valor.
 2. Subí los archivos modificados a GitHub (reemplazan a los anteriores).
 3. Al abrir la app aparece el aviso **"Actualizar"**; al tocarlo se carga la versión nueva.
 
