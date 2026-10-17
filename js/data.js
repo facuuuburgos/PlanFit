@@ -111,5 +111,18 @@
 
   const DIAS_SEMANA = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
-  root.PF_DATA = { BIBLIOTECA, FASES_COLORES, PLANTILLAS_PLAN, OBJETIVOS_SUGERIDOS, RECOMENDACIONES_BASE, DIAS_SEMANA };
+  /* ---------- módulo funcional e híbrido ---------- */
+  const TIPOS_BLOQUE = {
+    amrap:     { id: "amrap", nombre: "AMRAP", largo: "As Many Rounds As Possible", desc: "Tantas rondas como puedas en un tiempo fijo.", color: "#19C3B0" },
+    emom:      { id: "emom", nombre: "EMOM", largo: "Every Minute On the Minute", desc: "Cada minuto (o intervalo) se hace el trabajo y se descansa lo que sobre.", color: "#38A3F8" },
+    tabata:    { id: "tabata", nombre: "TABATA", largo: "Trabajo / descanso corto", desc: "Ej.: 8 rondas de 20 s de trabajo y 10 s de descanso.", color: "#F0609E" },
+    fortime:   { id: "fortime", nombre: "FOR TIME", largo: "Por tiempo", desc: "Completar un trabajo fijo lo más rápido posible, con time cap.", color: "#F5A524" },
+    circuito:  { id: "circuito", nombre: "CIRCUITO", largo: "Estaciones", desc: "Estaciones con tiempo de trabajo y descanso, por rondas.", color: "#9B7BFF" },
+    intervalos:{ id: "intervalos", nombre: "INTERVALOS", largo: "Series de trabajo y descanso", desc: "Ej.: 6 × 3' fuertes con 1' de pausa (correr, remo, bici).", color: "#43C06E" },
+    libre:     { id: "libre", nombre: "BLOQUE LIBRE", largo: "Fuerza, técnica o accesorios", desc: "Lista de ejercicios con series, repeticiones y carga a tu medida.", color: "#8B97AB" },
+  };
+  const EQUIPAMIENTO = ["Sin equipo", "Mancuernas", "Kettlebell", "Barra", "Discos", "Cajón", "Soga", "Pelota medicinal", "Wall ball", "Banda elástica", "TRX", "Barra de dominadas", "Anillas", "Remo", "Bicicleta", "Ski erg", "Trineo", "Cuerda de batalla", "Colchoneta", "Banco"];
+  BIBLIOTECA["Funcional / WOD"] = ["Thruster", "Wall ball", "Burpee", "Burpee over the bar", "Box jump", "Box step-up", "Doble salto de soga (double under)", "Toes to bar", "Dominadas (pull-up)", "Kettlebell swing", "Devil press", "Man maker", "Snatch con mancuerna", "Clean & jerk con mancuerna", "Peso muerto con kettlebell", "Remo (metros)", "Bicicleta (calorías)", "Ski erg (metros)", "Empuje de trineo", "Farmer carry", "Sprawl", "Mountain climbers", "Salto de tijera (jumping jack)", "Plancha con toque de hombro", "Rotación rusa con pelota", "Slam ball", "Press con mancuerna alterno", "Zancada caminando con mancuernas"];
+
+  root.PF_DATA = { TIPOS_BLOQUE, EQUIPAMIENTO, BIBLIOTECA, FASES_COLORES, PLANTILLAS_PLAN, OBJETIVOS_SUGERIDOS, RECOMENDACIONES_BASE, DIAS_SEMANA };
 })(typeof window !== "undefined" ? window : globalThis);

@@ -23,10 +23,7 @@
   const campo = (etq, b, valor, attrs = "") => `<label class="campo"><span>${h(etq)}</span><input data-b="${b}" value="${h(valor ?? "")}" ${attrs}></label>`;
   const interruptor = (t, sub, b, on) => `<label class="interruptor"><span class="t"><b>${h(t)}</b>${sub ? `<span>${h(sub)}</span>` : ""}</span><span class="sw"><input type="checkbox" data-sw="${b}" ${on ? "checked" : ""}><i></i></span></label>`;
 
-  const faseTexto = (plan) => {
-    const w = PF.semanaActual(plan), f = PF.faseDeSemana(plan, w);
-    return `Semana ${w} de ${plan.semanas}${f ? " · " + f.fase.nombre : ""}`;
-  };
+  const faseTexto = (plan) => UI.textoPlan(plan);
 
   /* ============ CLIENTES ============ */
 
@@ -53,7 +50,7 @@
 
   const hoyMenos = (dias) => Date.now() - dias * 86400000;
 
-  V.clientes = () => {
+  const inicio = (conLista) => {
     const d = Store.datos;
     const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
     const instalada = window.navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
@@ -69,13 +66,41 @@
       avisos.push(`<div class="aviso-caja">${UI.ic("alert")}<div><b>Haz una copia de seguridad</b><br>Tus datos se guardan solo en este dispositivo. <a href="#/ajustes" style="color:inherit;font-weight:700;text-decoration:underline">Guardar copia</a></div></div>`);
     }
 
-    const lista = UI.listaClientes(null);
+    const lista = conLista ? UI.listaClientes(null) : "";
+    const hoy = new Date();
+    const planes = d.planes.slice();
+    const enCurso = planes.filter((p) => p.tipo !== "funcional").filter((p) => { const i = PF.fechaDeISO(p.inicio); return i && hoy >= i && hoy < new Date(+i + p.semanas * 7 * 86400000); }).length;
+    const recientes = planes.filter((p) => Store.cliente(p.clienteId)).sort((x, y) => (y.modificado || 0) - (x.modificado || 0)).slice(0, 4);
+    const nombre = (d.entrenador.nombre || "").trim().split(/\s+/)[0];
+    const hora = hoy.getHours();
+    const saludo = hora < 6 ? "Buenas noches" : hora < 13 ? "Buenos días" : hora < 20 ? "Buenas tardes" : "Buenas noches";
+
+    const bienvenida = `
+      <section class="inicio">
+        <div class="inicio-hero">
+          <div><small>${saludo}</small><h2>${nombre ? h(nombre) : "Tu panel de entrenamiento"}</h2></div>
+          <div class="inicio-btns"><button class="btn primario" data-act="nuevo-cliente">${UI.ic("plus")}Nuevo cliente</button>${d.clientes.length ? `<button class="btn primario" data-act="nuevo-plan-rapido">${UI.ic("layers")}Nuevo plan</button>` : ""}</div>
+        </div>
+        <div class="inicio-acc">
+          <a class="acc" href="#/planes" style="--c:${UI.COLOR_FUERZA}"><span class="acc-ic">${UI.ic("layers")}</span><b>Mis planes</b><small>${planes.length} ${planes.length === 1 ? "plan" : "planes"}</small></a>
+          <a class="acc" href="#/biblioteca" style="--c:#2F6BFF"><span class="acc-ic">${UI.ic("book")}</span><b>Biblioteca de ejercicios</b><small>${Object.values(D.BIBLIOTECA).reduce((a, l) => a + l.length, 0) + (d.ejerciciosPropios || []).length} ejercicios</small></a>
+          <button class="acc" data-act="generar-pdf" style="--c:${UI.COLOR_FUNCIONAL}"><span class="acc-ic">${UI.ic("pdf")}</span><b>Generar PDF</b><small>Exporta un plan</small></button>
+        </div>
+        <div class="inicio-stats">
+          <div><b>${d.clientes.length}</b><span>${d.clientes.length === 1 ? "cliente" : "clientes"}</span></div>
+          <div><b>${enCurso}</b><span>${enCurso === 1 ? "plan en curso" : "planes en curso"}</span></div>
+          <div><b>${planes.length}</b><span>${planes.length === 1 ? "plan creado" : "planes creados"}</span></div>
+        </div>
+        ${recientes.length ? `<div class="titulo-sec">Continuar donde lo dejaste</div>
+          <div class="inicio-rec">${recientes.map((p) => { const c = Store.cliente(p.clienteId); return `<a class="fila" href="#/p/${p.id}"><span class="avatar" style="background:${UI.colorAvatar(c.nombre + c.id)}">${h(UI.iniciales(c.nombre))}</span><span class="t"><b>${h(c.nombre || "Cliente sin nombre")}</b><span>${h(p.titulo)} · ${h(faseTexto(p))}</span></span>${UI.ic("right", "flecha")}</a>`; }).join("")}</div>` : ""}
+        ${!d.clientes.length ? `<div class="vacio"><div class="ic">${UI.ic("users")}</div><h2>Empieza por tu primer cliente</h2><p>Crea un cliente, arma su plan de entrenamiento y envíale un PDF profesional en minutos.</p></div>` : ""}
+        ${conLista && d.clientes.length ? `<div class="titulo-sec">Todos los clientes</div>` : ""}
+      </section>`;
 
     return {
-      titulo: "Clientes",
-      acciones: `<button class="icono" data-act="nuevo-cliente" aria-label="Nuevo cliente">${UI.ic("plus")}</button>`,
-      html: `${avisos.join("")}
-        ${lista || `<div class="vacio"><div class="ic">${UI.ic("users")}</div><h2>Aún no hay clientes</h2><p>Crea un cliente, arma su plan de entrenamiento y envíale un PDF profesional en minutos.</p><button class="btn primario" data-act="nuevo-cliente">${UI.ic("plus")}Nuevo cliente</button></div>`}`,
+      titulo: "Inicio",
+      acciones: "",
+      html: `${avisos.join("")}${bienvenida}${lista}`,
       bind(el) {
         const b = $("#buscar", el);
         if (b) b.addEventListener("input", UI.debounce(() => { UI.estado.busqueda = b.value; UI.render(true); const n = $("#buscar"); n && (n.focus(), n.setSelectionRange(n.value.length, n.value.length)); }, 200));
@@ -84,11 +109,8 @@
       },
     };
   };
-
-  V.inicioAncho = () => ({
-    titulo: "PlanFit",
-    html: `<div class="vacio" style="padding-top:80px"><div class="ic">${UI.ic("dumbbell")}</div><h2>Rutinas profesionales en minutos</h2><p>Elige un cliente a la izquierda, o crea uno nuevo, para armar su plan de entrenamiento y exportarlo en PDF.</p><button class="btn primario" data-act="nuevo-cliente">${UI.ic("plus")}Nuevo cliente</button></div>`,
-  });
+  V.clientes = () => inicio(true);
+  V.inicioAncho = () => inicio(false);
 
   /* ============ CLIENTE ============ */
 
@@ -119,10 +141,10 @@
         <div class="titulo-sec">Planes
           <span class="der"><button class="btn chico suave" data-act="nuevo-plan">${UI.ic("plus")}Nuevo plan</button></span></div>
         ${planes.length ? planes.map((p) => {
-          const est = PF.estadoPlan(p);
-          return `<a class="fila" href="#/p/${p.id}"><span class="avatar" style="background:${(p.fases[0] || {}).color || "var(--acento)"}">${UI.ic("trend")}</span>
+          const est = p.tipo === "funcional" ? "" : PF.estadoPlan(p);
+          return `<a class="fila" href="#/p/${p.id}"><span class="avatar" style="background:${UI.tipoPlan(p).color}">${UI.ic(p.tipo === "funcional" ? "bolt" : "dumbbell")}</span>
             <span class="t"><b>${h(p.titulo)}</b><span>${h(faseTexto(p))}</span></span>
-            <span class="pildora ${est === "en curso" ? "ok" : ""}">${est}</span>${UI.ic("right", "flecha")}</a>`;
+            ${UI.pildoraTipo(p)}${est ? `<span class="pildora ${est === "en curso" ? "ok" : ""}">${est}</span>` : ""}${UI.ic("right", "flecha")}</a>`;
         }).join("") : `<div class="tarjeta" style="text-align:center;color:var(--txt2)">Este cliente todavía no tiene planes.<br><br><button class="btn primario" data-act="nuevo-plan">${UI.ic("plus")}Crear el primer plan</button></div>`}`;
 
     return {

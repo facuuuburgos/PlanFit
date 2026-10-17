@@ -352,8 +352,19 @@
       return `${PF.fechaCorta(a).slice(0, 5)} al ${PF.fechaCorta(b).slice(0, 5)}`;
     }
 
-    function cabeceraSemana(w) {
-      const p = nuevaPagina(null);
+    // niveles de compactación: se usa el más cómodo en el que el contenido entra con el menor número de páginas
+    const NIVELES = [
+      { fila: 30, pad: 14, gap: 22, hs: 8, tit: 34, fase: 19, esp: 1 },
+      { fila: 26, pad: 10, gap: 14, hs: 6, tit: 28, fase: 16, esp: 0.72 },
+      { fila: 23, pad: 7, gap: 10, hs: 5, tit: 24, fase: 14, esp: 0.5 },
+    ];
+    let NV = NIVELES[0];
+
+    const NULO = new Proxy({}, { get: (t, k) => (k === "alturaBloque" || k === "medir") ? S.p[k].bind(S.p) : () => 0 });
+
+    // dibujar=false: solo calcula hasta dónde llega la cabecera (para planificar la paginación)
+    function cabeceraSemana(w, dibujar = true) {
+      const p = dibujar ? nuevaPagina(null) : NULO;
       const info = PF.faseDeSemana(plan, w);
       const color = info ? info.fase.color : acento;
       const desc = plan.semInfo[w - 1] && plan.semInfo[w - 1].descarga;
@@ -361,21 +372,21 @@
       p.text("PLAN DE ENTRENAMIENTO", M, 34, { size: 7.5, font: "b", color: GRIS2, spacing: 1.6 });
       p.text((cliente.nombre || "").toUpperCase(), PW - M, 34, { size: 7.5, font: "b", color: GRIS2, align: "right", spacing: 1.2 });
 
-      p.text(`Semana ${w}`, M, 54, { size: 34, font: "b", color: TINTA });
+      p.text(`Semana ${w}`, M, 54, { size: NV.tit, font: "b", color: TINTA });
       const nombreFase = info ? info.fase.nombre : "";
-      let y = 98;
+      let y = 54 + NV.tit + 10 * NV.esp;
       if (nombreFase) {
-        p.text(nombreFase, M, y, { size: 19, color: TINTA });
+        p.text(nombreFase, M, y, { size: NV.fase, color: TINTA });
         if (desc) {
-          const t = "DESCARGA", nx = M + p.medir(nombreFase, 19, "r") + 14;
+          const t = "DESCARGA", nx = M + p.medir(nombreFase, NV.fase, "r") + 14;
           const tw = p.medir(t, 6.8, "b", 1) + 16;
           p.rect(nx, y + 3, tw, 15, { fill: tinte(color, 0.78), r: 7.5 });
           p.text(t, nx + tw / 2, y + 7.3, { size: 6.8, font: "b", color: oscuro(color, 0.5), align: "center", spacing: 1 });
         }
-        y += 28;
-      } else if (desc) { p.text("Semana de descarga", M, y, { size: 14, color: TINTA }); y += 24; }
+        y += NV.fase + 9 * NV.esp;
+      } else if (desc) { p.text("Semana de descarga", M, y, { size: 14, color: TINTA }); y += 24 * NV.esp; }
       p.text(`${nombreFechaSemana(w)}   ·   Semana ${w} de ${plan.semanas}`, M, y, { size: 10, color: GRIS });
-      y += 22;
+      y += 22 * NV.esp;
 
       // barra del plan (fina): muestra dónde estás
       const gap = 1.6, sw = (CW - gap * (plan.semanas - 1)) / plan.semanas;
@@ -385,19 +396,18 @@
         const es = k === w;
         p.rect(M + (k - 1) * (sw + gap), es ? y - 1.5 : y, sw, es ? 6 : 3, { fill: es ? oscuro(col, 0.25) : tinte(col, 0.45), r: Math.min(1.6, sw / 2) });
       }
-      y += 22;
+      y += 22 * NV.esp;
 
       const nota = plan.semInfo[w - 1] && plan.semInfo[w - 1].nota;
       if (nota) {
         const h = p.alturaBloque(nota, CW - 32, 9.5, "i", 13);
         p.rect(M, y, CW, h + 20, { fill: FONDO, r: 12 });
         p.bloque(nota, M + 16, y + 10, CW - 32, { size: 9.5, font: "i", color: TINTA, lh: 13 });
-        y += h + 20 + 14;
+        y += h + 20 + 14 * NV.esp;
       }
 
-      S.rotuloActual = `SEMANA ${w}`;
-      S.y = y;
-      return { color };
+      if (dibujar) { S.rotuloActual = `SEMANA ${w}`; S.y = y; }
+      return { color, y };
     }
 
     // columnas de la tabla de ejercicios
@@ -423,7 +433,7 @@
       const nota = [e.tempo ? `Tempo ${e.tempo}` : "", opciones.notas ? e.nota : ""].filter(Boolean).join("  ·  ");
       const hNom = p.alturaBloque(PF.nombreEn(e, w) || "Ejercicio", cEj.w - 10, 10, "b", 12.5);
       const hNota = nota ? p.alturaBloque(nota, cEj.w - 10, 8, "r", 10.5) + 1 : 0;
-      const h = Math.max(30, hNom + hNota + 14);
+      const h = Math.max(NV.fila, hNom + hNota + NV.pad);
 
       return { h, dibujar(yy) {
         // número en círculo / etiqueta de superserie
@@ -475,23 +485,28 @@
       return y + 22;
     }
 
-    function sesion(sesCompleta, idxSesion, w, color) {
-      // solo los ejercicios que aparecen en esta semana; si la sesión no tiene ninguno, no se imprime
-      const ejsSemana = sesCompleta.ejercicios.filter((e) => PF.activo(e, w));
-      if (!ejsSemana.length) return;
-      const ses = Object.assign({}, sesCompleta, { ejercicios: ejsSemana });
+    // Prepara una sesión de una semana: cabecera, filas y alturas (sin dibujar)
+    function prepararSesion(sesCompleta, idxSesion, w, color) {
+      const ejs = sesCompleta.ejercicios.filter((e) => PF.activo(e, w));
+      if (!ejs.length) return null;
+      const ses = Object.assign({}, sesCompleta, { ejercicios: ejs });
       const cols = columnas();
-      const total = ses.ejercicios.reduce((a, e) => a + (+((e.sem[w - 1] || {}).s) || 0), 0);
-
-      asegurar(120, `SEMANA ${w}`);
-      let p = S.p, y = S.y;
-
-      const dia = ses.dia ? DIAS_CORTOS[ses.dia] || String(ses.dia).slice(0, 3).toUpperCase() : "";
+      const p = S.p;
+      const total = ejs.reduce((a, e) => a + (+((e.sem[w - 1] || {}).s) || 0), 0);
       const calTxt = ses.calentamiento ? "Calentamiento: " + ses.calentamiento : "";
       const hCal = calTxt ? p.alturaBloque(calTxt, CW - 150, 8.5, "r", 11.5) : 0;
       const base = ses.foco ? 44 : 31;
       const hHead = Math.max(base + (hCal ? hCal + 2 : 0) + 10, 42);
+      const filas = ejs.map((e, k) => filaEjercicio(p, cols, e, k, w, 0, false, color));
+      return { ses, idxSesion, cols, total, calTxt, base, hHead, filas, color, w };
+    }
 
+    const altoCabSesion = (ps) => ps.hHead + NV.hs + 22;
+    const altoFilas = (ps, d, h) => { let t = 0; for (let i = d; i < h; i++) t += ps.filas[i].h; return t; };
+
+    function dibujarCabSesion(p, ps, y) {
+      const { ses, idxSesion, total, calTxt, base, hHead, color } = ps;
+      const dia = ses.dia ? DIAS_CORTOS[ses.dia] || String(ses.dia).slice(0, 3).toUpperCase() : "";
       p.rect(M, y, CW, hHead, { fill: tinte(color, 0.82), r: 12 });
       let tx = M + 16;
       if (dia) {
@@ -508,37 +523,76 @@
       p.text(`${ses.ejercicios.length} ${ses.ejercicios.length === 1 ? "ejercicio" : "ejercicios"}`, PW - M - 16, y + 11, { size: 8, color: oscuro(color, 0.55), align: "right" });
       p.text(`${total} series`, PW - M - 16, y + 23, { size: 8, color: oscuro(color, 0.55), align: "right" });
       if (calTxt) p.bloque(calTxt, M + 16, y + base - 2, CW - 150, { size: 8.5, color: oscuro(color, 0.55), lh: 11.5 });
-      y += hHead + 8;
-
-      if (!ses.ejercicios.length) {
-        p.text("Sesión sin ejercicios", M + 14, y + 4, { size: 9, font: "i", color: GRIS2 });
-        S.y = y + 30;
-        return;
-      }
-
-      y = cabeceraTabla(p, cols, y);
-
-      ses.ejercicios.forEach((e, k) => {
-        const fila = filaEjercicio(p, cols, e, k, w, 0, false, color);
-
-        if (y + fila.h > LIMITE) {
-          nuevaPagina(`SEMANA ${w}`);
-          p = S.p;
-          p.text(`${(ses.nombre || "Sesión " + (idxSesion + 1)).toUpperCase()}  (continuación)`, M, S.y, { size: 8, font: "b", color: GRIS, spacing: 1 });
-          y = cabeceraTabla(p, cols, S.y + 14);
-        }
-
-        const f2 = filaEjercicio(p, cols, e, k, w, y, false, color);
-        f2.dibujar(y);
-        y += f2.h;
-      });
-
-      S.y = y + 24;
+      return y + hHead + NV.hs;
     }
 
-    function paginaSemana(w) {
-      const { color } = cabeceraSemana(w);
-      plan.sesiones.forEach((s, i) => sesion(s, i, w, color));
+    // Planifica la paginación de una semana con el nivel de compactación actual.
+    // Regla: cada sesión se mantiene entera; solo se parte si no cabe en ninguna página o si dejaría un hueco enorme.
+    function planificarSemana(prep, yInicio) {
+      const paginas = [{ items: [], y: yInicio }];
+      const LIM = LIMITE, TOPE = 54;
+      let pg = paginas[0];
+      const nueva = () => { pg = { items: [], y: TOPE }; paginas.push(pg); };
+      for (const ps of prep) {
+        const n = ps.filas.length, hCab = altoCabSesion(ps), total = hCab + altoFilas(ps, 0, n);
+        const libre = () => LIM - pg.y;
+        const capNueva = LIM - TOPE;
+        if (total <= libre()) { pg.items.push({ ps, d: 0, h: n, cab: true }); pg.y += total + NV.gap; continue; }
+        // ¿cabe entera en una página nueva?
+        const hueco = libre();
+        let partir = false;
+        if (total > capNueva) partir = true;
+        else if (hueco > capNueva * 0.5 && hCab + ps.filas.slice(0, 3).reduce((a, f) => a + f.h, 0) <= hueco) partir = true;
+        if (!partir) { if (pg.items.length) nueva(); pg.items.push({ ps, d: 0, h: n, cab: true }); pg.y += total + NV.gap; continue; }
+        // partir: se llena la página actual dejando al menos 2 filas para la siguiente
+        let d = 0, primera = true;
+        while (d < n) {
+          const cab = primera ? hCab : 14 + 22;
+          let y = pg.y + cab, k = d;
+          while (k < n && y + ps.filas[k].h <= LIM) { y += ps.filas[k].h; k++; }
+          if (k < n && n - k < 2 && k - d > 2) { k--; y -= ps.filas[k].h; }   // evita una fila suelta
+          if (k - d < 1 || (k - d < 2 && k < n)) {
+            if (pg.y > TOPE + 0.1) { nueva(); continue; }
+            k = Math.max(k, d + 1); y = pg.y + cab + altoFilas(ps, d, k);   // página vacía: se coloca lo que haya
+          }
+          pg.items.push({ ps, d, h: k, cab: primera, cont: !primera });
+          pg.y = y + NV.gap; d = k; primera = false;
+          if (d < n) nueva();
+        }
+      }
+      // última página: no cuenta el hueco final
+      return paginas.filter((x) => x.items.length);
+    }
+
+    function paginaSemana(w, cola = 0) {
+      const color = (PF.faseDeSemana(plan, w) || { fase: { color: acento } }).fase.color;
+      let mejor = null;
+      for (const nivel of NIVELES) {
+        NV = nivel;
+        const prep = plan.sesiones.map((s, i) => prepararSesion(s, i, w, color)).filter(Boolean);
+        const yIni = cabeceraSemana(w, false).y;
+        const pags = planificarSemana(prep, yIni);
+        const ult = pags[pags.length - 1];
+        const cand = { nivel, prep, pags, n: pags.length + (cola && ult && ult.y - NV.gap + cola > LIMITE ? 1 : 0) };
+        if (!mejor || cand.n < mejor.n) mejor = cand;
+        if (mejor.n <= 1) break;
+      }
+      NV = mejor.nivel;
+      cabeceraSemana(w, true);
+      mejor.pags.forEach((pagina, i) => {
+        if (i > 0) nuevaPagina(`SEMANA ${w}`);
+        let p = S.p, y = i === 0 ? S.y : S.y;
+        pagina.items.forEach((it) => {
+          const ps = it.ps;
+          if (it.cab) y = dibujarCabSesion(p, ps, y);
+          else { p.text(`${(ps.ses.nombre || "Sesión " + (ps.idxSesion + 1)).toUpperCase()}  (continuación)`, M, y, { size: 8, font: "b", color: GRIS, spacing: 1 }); y += 14; }
+          y = cabeceraTabla(p, ps.cols, y);
+          for (let k = it.d; k < it.h; k++) { const f = filaEjercicio(p, ps.cols, ps.ses.ejercicios[k], k, w, y, false, ps.color); f.dibujar(y); y += f.h; }
+          y += NV.gap;
+        });
+        S.y = y;
+      });
+      NV = NIVELES[0];
     }
 
     /* ============ EVOLUCIÓN ============ */
@@ -564,7 +618,20 @@
           const listaB = lista.filter((e) => bloque.some((w) => PF.activo(e, w)));
           if (!listaB.length) continue;
 
-          asegurar(120, "EVOLUCIÓN DEL PLAN");
+          // un ejercicio con variantes se reparte en una fila por nombre efectivo
+          const filasB = [];
+          listaB.forEach((e) => {
+            const nombres = [...new Set(bloque.filter((w) => PF.activo(e, w)).map((w) => PF.nombreEn(e, w)))];
+            nombres.forEach((nm) => filasB.push({ e, nm }));
+          });
+
+          // la tabla se mantiene entera: si no cabe en lo que queda pero sí en una página nueva, pasa a la siguiente
+          const altoTabla = 20 + 38 + filasB.reduce((a, f) => a + Math.max(32, S.p.alturaBloque(f.nm || "Ejercicio", nameW - 14, 9, "b", 11.5, 2) + 12), 0);
+          const resto = LIMITE - S.y, pagina = LIMITE - 54;
+          if (altoTabla > resto) {
+            if (altoTabla <= pagina && resto < pagina * 0.62) nuevaPagina("EVOLUCIÓN DEL PLAN");
+            else if (resto < 20 + 38 + 3 * 32) nuevaPagina("EVOLUCIÓN DEL PLAN");
+          }
           let p = S.p, yy = S.y;
 
           p.text(`${ses.nombre || "Sesión " + (si + 1)}`, M, yy, { size: 11.5, font: "b", color: TINTA });
@@ -588,13 +655,6 @@
           };
 
           yy = cabecera(p, yy);
-
-          // un ejercicio con variantes se reparte en una fila por nombre efectivo
-          const filasB = [];
-          listaB.forEach((e) => {
-            const nombres = [...new Set(bloque.filter((w) => PF.activo(e, w)).map((w) => PF.nombreEn(e, w)))];
-            nombres.forEach((nm) => filasB.push({ e, nm }));
-          });
 
           filasB.forEach(({ e, nm }, k) => {
             const hNom = p.alturaBloque(nm || "Ejercicio", nameW - 14, 9, "b", 11.5, 2);
@@ -681,10 +741,9 @@
 
     /* ============ GUÍA Y CIERRE ============ */
 
-    function cierre() {
+    function datosCierre(compacto) {
       const rec = (opciones.recomendaciones ? plan.recomendaciones : []).filter((t) => t && t.trim());
       const notas = (plan.notas || "").trim();
-
       const glos = [];
       glos.push(["Series × Reps", "Series y repeticiones."]);
       glos.push(["Desc.", "Descanso entre series (90\" = 90 seg)."]);
@@ -692,12 +751,19 @@
       if (opciones.rpe) glos.push(["RPE", "Esfuerzo de 1 a 10 (8 = quedan ~2 reps)."]);
       if (opciones.tempo) glos.push(["Tempo", "Bajada–pausa–subida–pausa (seg)."]);
       if (opciones.registro) glos.push(["Mi carga", "Anota el peso que usaste."]);
-
       const filasG = Math.ceil(glos.length / 2);
-      const hG = 38 + filasG * 18;
+      const textoCompacto = glos.map((g) => `${g[0]}: ${g[1]}`).join("   ·   ");
+      const hG = compacto ? 24 + S.p.alturaBloque(textoCompacto, CW - 8, 7.8, "r", 10.5) + 4 : 38 + filasG * 18;
       const hR = rec.length ? 14 + rec.reduce((a, t) => a + S.p.alturaBloque(t, CW - 52, 9, "r", 12.5) + 5, 0) + 6 : 0;
       const hN = notas ? 34 + S.p.alturaBloque(notas, CW - 32, 9.5, "r", 13) : 0;
+      const contacto = [ent.contacto, ent.web].filter(Boolean).length ? 40 : 0;
+      return { rec, notas, glos, filasG, hG, hR, hN, textoCompacto, total: (notas ? hN : 0) + (rec.length ? hR + 30 : 0) + hG + 14 + contacto };
+    }
 
+    function cierre() {
+      let dc = datosCierre(false);
+      if (S.y + dc.total > LIMITE) { const c2 = datosCierre(true); if (S.y + c2.total <= LIMITE) dc = c2; dc.compacto = dc === c2; }
+      const { rec, notas, glos, filasG, hG, hR, hN } = dc;
       if (!notas && !rec.length && S.y + hG + 20 > LIMITE) nuevaPagina("CÓMO LEER TU PLAN");
       else if ((notas || rec.length) && S.y + Math.min(hN + hR + 40, 200) > LIMITE) nuevaPagina("NOTAS");
       let p = S.p, y = S.y;
@@ -724,14 +790,19 @@
 
       if (y + hG > LIMITE) { nuevaPagina("CÓMO LEER TU PLAN"); p = S.p; y = S.y; }
       y = titulo("Cómo leer tu plan", y);
-      const cw2 = (CW - 24) / 2;
-      glos.forEach((g, i) => {
-        const col = i % 2, fila = Math.floor(i / 2);
-        const gx = M + 4 + col * (cw2 + 24), gy = y + fila * 18;
-        p.text(g[0], gx, gy, { size: 8.5, font: "b", color: TINTA });
-        p.text(g[1], gx + 62, gy, { size: 8, color: GRIS });
-      });
-      y += filasG * 18 + 6;
+      if (dc.compacto) {
+        const h2 = p.bloque(dc.textoCompacto, M + 4, y - 2, CW - 8, { size: 7.8, color: GRIS, lh: 10.5 });
+        y += h2 + 8;
+      } else {
+        const cw2 = (CW - 24) / 2;
+        glos.forEach((g, i) => {
+          const col = i % 2, fila = Math.floor(i / 2);
+          const gx = M + 4 + col * (cw2 + 24), gy = y + fila * 18;
+          p.text(g[0], gx, gy, { size: 8.5, font: "b", color: TINTA });
+          p.text(g[1], gx + 62, gy, { size: 8, color: GRIS });
+        });
+        y += filasG * 18 + 6;
+      }
 
       // contacto discreto
       const contactos = [ent.contacto, ent.web].filter(Boolean);
@@ -755,7 +826,7 @@
     portada();
 
     if (plan.sesiones.some((s) => s.ejercicios.length)) {
-      for (const w of semanas) paginaSemana(w);
+      semanas.forEach((w, i) => paginaSemana(w, alcance === "semana" && i === semanas.length - 1 ? Math.min(datosCierre(true).total, 230) + 12 : 0));
       if (alcance !== "semana") evolucion();
     }
 

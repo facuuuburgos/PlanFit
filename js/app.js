@@ -3,7 +3,7 @@
   "use strict";
 
   const UI = root.UI, PF = root.PF, D = root.PF_DATA, Store = PF.Store, h = UI.h, $ = UI.$, $$ = UI.$$;
-  UI.VERSION = "1.9.1";
+  UI.VERSION = "1.11.0";
   UI.lateralOculto = () => { try { return localStorage.getItem("planfit.lateralOculto") === "1"; } catch (e) { return false; } };
 
   const ancho = () => matchMedia("(min-width: 900px)").matches;
@@ -15,6 +15,8 @@
     if (p[0] === "c" && p[1]) return { n: "cliente", id: p[1] };
     if (p[0] === "p" && p[1]) return { n: "plan", id: p[1] };
     if (p[0] === "ajustes") return { n: "ajustes" };
+    if (p[0] === "planes") return { n: "planes" };
+    if (p[0] === "biblioteca") return { n: "biblioteca" };
     return { n: "clientes" };
   }
 
@@ -42,9 +44,12 @@
 
     if (r.n === "clientes") vista = ancho() ? UI.vistas.inicioAncho() : UI.vistas.clientes();
     else if (r.n === "cliente") vista = UI.vistas.cliente(r);
-    else if (r.n === "plan") vista = UI.vistas.plan(r);
+    else if (r.n === "plan") vista = (Store.plan(r.id) || {}).tipo === "funcional" ? UI.vistas.funcional(r) : UI.vistas.plan(r);
+    else if (r.n === "planes") vista = UI.vistas.planes();
+    else if (r.n === "biblioteca") vista = UI.vistas.biblioteca();
     else vista = UI.vistas.ajustes();
 
+    const esFx = r.n === "plan" && (Store.plan(r.id) || {}).tipo === "funcional";
     const activo = r.n === "cliente" ? r.id : r.n === "plan" ? (Store.plan(r.id) || {}).clienteId : null;
     const enSesion = r.n === "clientes" || r.n === "ajustes" || r.n === "cliente" || r.n === "plan";
 
@@ -54,7 +59,12 @@
           <button class="icono" data-act="nuevo-cliente" aria-label="Nuevo cliente">${UI.ic("plus")}</button>
           <button class="icono gris" data-act="lateral" aria-label="Ocultar la lista de clientes" title="Ocultar la lista">${UI.ic("panel")}</button></div>
         <div class="lat-lista" id="lat-lista">${Store.datos.clientes.length ? UI.listaClientes(activo) : `<p class="muted peq" style="padding:10px 8px">Aún no hay clientes.</p>`}</div>
-        <div class="lat-pie"><a class="btn bloque ${r.n === "ajustes" ? "suave" : ""}" href="#/ajustes">${UI.ic("settings")}Ajustes</a></div>
+        <nav class="lat-nav">
+          <a class="${!["ajustes", "planes", "biblioteca"].includes(r.n) ? "on" : ""}" href="#/">${UI.ic("home")}Inicio</a>
+          <a class="${r.n === "planes" ? "on" : ""}" href="#/planes">${UI.ic("layers")}Mis planes</a>
+          <a class="${r.n === "biblioteca" ? "on" : ""}" href="#/biblioteca">${UI.ic("book")}Biblioteca</a>
+          <a class="${r.n === "ajustes" ? "on" : ""}" href="#/ajustes">${UI.ic("settings")}Ajustes</a>
+        </nav>
       </aside>`;
 
     const banner = "";
@@ -68,12 +78,14 @@
           <h1>${h(vista.titulo)}${vista.sub ? `<span class="sub">${h(vista.sub)}</span>` : ""}</h1>
           ${vista.acciones || ""}
         </header>
-        <main class="contenido ${r.n === "plan" ? "ancho" : ""} ${UI.amplia() && (r.n === "plan" || r.n === "cliente") ? "amplio" : ""}" id="main">${vista.html}</main>
+        <main class="contenido ${r.n === "plan" ? "ancho" : ""} ${r.n === "plan" && esFx ? "fx-pag" : ""} ${UI.amplia() && !esFx && (r.n === "plan" || r.n === "cliente") ? "amplio" : ""}" id="main">${vista.html}</main>
       </div>`;
 
     const tab = `
       <nav class="tabbar">
-        <button class="${r.n !== "ajustes" ? "on" : ""}" data-ir="#/">${UI.ic("users")}Clientes</button>
+        <button class="${!["ajustes", "planes", "biblioteca"].includes(r.n) ? "on" : ""}" data-ir="#/">${UI.ic("home")}Inicio</button>
+        <button class="${r.n === "planes" ? "on" : ""}" data-ir="#/planes">${UI.ic("layers")}Planes</button>
+        <button class="${r.n === "biblioteca" ? "on" : ""}" data-ir="#/biblioteca">${UI.ic("book")}Biblioteca</button>
         <button class="${r.n === "ajustes" ? "on" : ""}" data-ir="#/ajustes">${UI.ic("settings")}Ajustes</button>
       </nav>`;
 
@@ -176,10 +188,21 @@
 
   const ACCIONES = {
     "nuevo-cliente"() {
-      const c = PF.nuevoCliente();
-      Store.datos.clientes.push(c); Store.guardar();
-      UI.nav("#/c/" + c.id);
-      setTimeout(() => { const i = $('[data-b="c:nombre"]'); i && i.focus(); }, 350);
+      const hoja = UI.hoja({
+        titulo: "Nuevo cliente", clase: "dialogo",
+        html: `<label class="campo"><span>Nombre y apellido</span><input id="nc-nombre" placeholder="Ej.: Lucía Fernández" autocapitalize="words" autocomplete="off"></label><p class="ayuda">Después podrás completar edad, medidas, objetivos y lesiones.</p>`,
+        pie: `<button class="btn" data-cerrar>Cancelar</button><button class="btn primario" id="nc-ok">Crear cliente</button>`,
+        alAbrir: (hh) => setTimeout(() => { const i = $("#nc-nombre", hh.el); i && i.focus(); }, 320),
+      });
+      const crear = () => {
+        const nombre = $("#nc-nombre", hoja.el).value.trim();
+        if (!nombre) { UI.aviso("Escribe el nombre del cliente", { error: true }); $("#nc-nombre", hoja.el).focus(); return; }
+        const c = PF.nuevoCliente(); c.nombre = nombre;
+        Store.datos.clientes.push(c); Store.guardar();
+        hoja.cerrar(); UI.nav("#/c/" + c.id);
+      };
+      $("#nc-ok", hoja.el).addEventListener("click", crear);
+      $("#nc-nombre", hoja.el).addEventListener("keydown", (ev) => { if (ev.key === "Enter") crear(); });
     },
 
     "menu-cliente"() {
@@ -197,9 +220,13 @@
       ]);
     },
 
-    "nuevo-plan"() {
+    "nuevo-plan"() { UI.elegirTipoPlan(clienteActual()); },
+    "nuevo-plan-rapido"() { UI.nuevoPlanRapido(); },
+    "generar-pdf"() { UI.generarPDFRapido(); },
+
+    "nuevo-plan-fuerza"() {
       const c = clienteActual();
-      const otros = Store.datos.planes.slice().sort((a, b) => b.modificado - a.modificado).slice(0, 6);
+      const otros = Store.datos.planes.filter((p) => p.tipo !== "funcional").slice().sort((a, b) => b.modificado - a.modificado).slice(0, 6);
       const hoja = UI.hoja({
         titulo: "Nuevo plan",
         html: `<div class="titulo-sec" style="margin-top:4px">Empieza con una estructura</div>
@@ -359,6 +386,7 @@
       setTimeout(() => { if (UI.hayActualizacion) UI.aviso("Hay una versión nueva", { accion: "Actualizar", alAccion: aplicarActualizacion, ms: 8000 }); else UI.aviso("Ya tienes la última versión"); }, 1200);
     },
   };
+  UI.acciones = ACCIONES;
 
   function elegirClienteParaCopia(plan) {
     const otros = Store.datos.clientes.filter((c) => c.id !== plan.clienteId);
@@ -375,6 +403,15 @@
 
   function crearPDF() {
     const plan = planActual(), cli = Store.cliente(plan.clienteId);
+    if (plan.tipo === "funcional") {
+      const bytes = root.PlanPDF.generarFuncional(plan, cli, Store.datos.entrenador, {});
+      const nombre = [UI.nombreArchivo(cli && cli.nombre), UI.nombreArchivo(plan.titulo), "Funcional"].filter(Boolean).join("_") + ".pdf";
+      let paginas = 0;
+      try { const txt = new TextDecoder("latin1").decode(bytes); paginas = (txt.match(/\/Type \/Page /g) || []).length; } catch (x) { /* nada */ }
+      const info = $("#pdf-info");
+      if (info) info.textContent = `${nombre} · ${paginas} ${paginas === 1 ? "página" : "páginas"} · ${Math.max(1, Math.round(bytes.length / 1024))} KB`;
+      return { bytes, nombre };
+    }
     const e = UI.estado.pdf;
     const alcance = e.alcance;
     const rf = PF.rangosFases(plan)[e.fase || 0];

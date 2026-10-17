@@ -82,7 +82,7 @@
     const act = Array.from({ length: plan.semanas }, (_, i) => { const r = rangos.find((x) => i + 1 >= x.desde && i + 1 <= x.hasta); return !r || ids.includes(r.fase.id); });
     if (act.every(Boolean)) delete e.act; else e.act = act;
   };
-  PF.sincronizarFases = (plan) => { const rg = PF.rangosFases(plan); for (const s of plan.sesiones) for (const e of s.ejercicios) PF.sincEj(plan, rg, e); };
+  PF.sincronizarFases = (plan) => { if (plan.tipo === "funcional") return; const rg = PF.rangosFases(plan); for (const s of plan.sesiones) for (const e of s.ejercicios) PF.sincEj(plan, rg, e); };
   PF.ponerActivo = (e, n, w, valor) => { const l = PF.semanasActivas(e, n).filter((x) => x !== w); if (valor) l.push(w); PF.ponerActivas(e, n, l); };
   /* ---------- variantes: otro nombre para el mismo ejercicio en ciertas semanas ----------
      ej.vars = lista (una por semana) con el nombre de la variante, o "" si esa semana usa el ejercicio original. */
@@ -132,11 +132,105 @@
     return plan;
   };
 
+  /* ---------- planes funcionales (AMRAP, EMOM, Tabata, For Time, circuitos, intervalos) ---------- */
+
+  const PARAMS = {
+    amrap: { minutos: 12 },
+    emom: { minutos: 12, cada: 60, modo: "alterna" },
+    tabata: { rondas: 8, trabajo: 20, descanso: 10, series: 1, descansoSerie: 60 },
+    fortime: { rondas: 3, timeCap: 15, esquema: "" },
+    circuito: { rondas: 3, trabajo: 40, descanso: 20, descansoRonda: 60 },
+    intervalos: { series: 6, trabajo: 180, descanso: 60 },
+    libre: {},
+  };
+
+  PF.fmtTiempo = (seg) => {
+    const t = Math.round(+seg || 0);
+    if (t < 60) return `${t}"`;
+    const m = Math.floor(t / 60), r = t % 60;
+    return r ? `${m}'${String(r).padStart(2, "0")}"` : `${m}'`;
+  };
+  const plural = (n, u, p) => `${n} ${n === 1 ? u : p}`;
+
+  PF.nuevoEjFunc = (nombre = "") => ({ id: PF.id(), nombre, reps: "", carga: "", equip: [], nota: "" });
+  PF.nuevoBloque = (tipo = "amrap") => ({ id: PF.id(), tipo, nombre: "", nota: "", descansoDespues: 0, ...PARAMS[tipo], ejercicios: [] });
+  PF.nuevaSesionFunc = (nombre = "") => ({ id: PF.id(), nombre, dia: "", foco: "", calentamiento: "", bloques: [] });
+
+  PF.nuevoPlanFuncional = (clienteId) => {
+    const plan = {
+      id: PF.id(), tipo: "funcional", clienteId, titulo: "Entrenamiento funcional", inicio: PF.hoyISO(), semanas: 1, semanaManual: null,
+      fases: [], semInfo: [], sesiones: [], opciones: { equipo: true, notas: true }, recomendaciones: [], notas: "",
+      creado: Date.now(), modificado: Date.now(),
+    };
+    return plan;
+  };
+
+  // título corto del bloque: «AMRAP 12'», «EMOM 10'», «TABATA 8 × 20"/10"»…
+  PF.tituloBloque = (b) => {
+    switch (b.tipo) {
+      case "amrap": return `AMRAP ${b.minutos || 0}'`;
+      case "emom": return `EMOM ${b.minutos || 0}'`;
+      case "tabata": return `TABATA ${b.rondas || 0} × ${b.trabajo || 0}"/${b.descanso || 0}"`;
+      case "fortime": return `FOR TIME${b.rondas > 1 ? " · " + b.rondas + " rondas" : ""}`;
+      case "circuito": return `CIRCUITO · ${plural(b.rondas || 1, "ronda", "rondas")}`;
+      case "intervalos": return `INTERVALOS ${b.series || 0} × ${PF.fmtTiempo(b.trabajo)}`;
+      default: return "BLOQUE LIBRE";
+    }
+  };
+
+  // explicación en una línea
+  PF.detalleBloque = (b) => {
+    const n = b.ejercicios.length;
+    switch (b.tipo) {
+      case "amrap": return `Tantas rondas como puedas en ${b.minutos || 0} min`;
+      case "emom": return `Cada ${PF.fmtTiempo(b.cada || 60)} durante ${b.minutos || 0} min` + (b.modo === "alterna" && n > 1 ? " · alterna los ejercicios" : b.modo === "todos" && n > 1 ? " · todos los ejercicios cada vez" : "");
+      case "tabata": return `${b.trabajo || 0}" trabajo / ${b.descanso || 0}" descanso · ${plural(b.rondas || 0, "ronda", "rondas")}` + (b.series > 1 ? ` · ${b.series} series (pausa ${PF.fmtTiempo(b.descansoSerie)})` : "");
+      case "fortime": return [b.esquema ? `Esquema ${b.esquema}` : (b.rondas > 1 ? plural(b.rondas, "ronda", "rondas") : "1 ronda"), b.timeCap ? `time cap ${b.timeCap} min` : "sin time cap"].join(" · ");
+      case "circuito": return `${plural(n, "estación", "estaciones")} · ${PF.fmtTiempo(b.trabajo)} trabajo / ${PF.fmtTiempo(b.descanso)} descanso` + (b.rondas > 1 && b.descansoRonda ? ` · pausa entre rondas ${PF.fmtTiempo(b.descansoRonda)}` : "");
+      case "intervalos": return `${b.series || 0} × ${PF.fmtTiempo(b.trabajo)} con ${PF.fmtTiempo(b.descanso)} de pausa`;
+      default: return "";
+    }
+  };
+
+  // duración estimada en segundos (null si no se puede estimar)
+  PF.duracionBloque = (b) => {
+    const n = Math.max(1, b.ejercicios.length);
+    let t = null;
+    switch (b.tipo) {
+      case "amrap": t = (b.minutos || 0) * 60; break;
+      case "emom": t = (b.minutos || 0) * 60; break;
+      case "tabata": t = (b.series || 1) * (b.rondas || 0) * ((b.trabajo || 0) + (b.descanso || 0)) + Math.max(0, (b.series || 1) - 1) * (b.descansoSerie || 0); break;
+      case "fortime": t = b.timeCap ? b.timeCap * 60 : null; break;
+      case "circuito": t = (b.rondas || 1) * n * ((b.trabajo || 0) + (b.descanso || 0)) + Math.max(0, (b.rondas || 1) - 1) * (b.descansoRonda || 0); break;
+      case "intervalos": t = (b.series || 0) * (b.trabajo || 0) + Math.max(0, (b.series || 0) - 1) * (b.descanso || 0); break;
+      default: t = null;
+    }
+    return t;
+  };
+  PF.duracionSesionMin = (ses) => Math.round(ses.bloques.reduce((a, b) => a + (PF.duracionBloque(b) || 0) + (b.descansoDespues || 0), 0) / 60);
+
+  PF.normalizarFuncional = (plan) => {
+    plan.fases = []; plan.semInfo = []; plan.semanas = 1;
+    plan.opciones = Object.assign({ equipo: true, notas: true }, plan.opciones || {});
+    plan.sesiones = plan.sesiones || [];
+    for (const s of plan.sesiones) {
+      s.bloques = s.bloques || [];
+      for (const b of s.bloques) {
+        b.tipo = PARAMS[b.tipo] ? b.tipo : "libre";
+        for (const [k, v] of Object.entries(PARAMS[b.tipo])) if (b[k] === undefined) b[k] = v;
+        b.ejercicios = b.ejercicios || [];
+        for (const e of b.ejercicios) { e.equip = Array.isArray(e.equip) ? e.equip : []; e.reps = e.reps ?? ""; e.carga = e.carga ?? ""; e.nota = e.nota ?? ""; }
+      }
+    }
+    return plan;
+  };
+
   /* ---------- normalización ---------- */
 
   PF.OPCIONES_BASE = { pct: true, kg: true, rpe: false, tempo: false, notas: true, registro: true, seguimiento: true, recomendaciones: false };
 
   PF.normalizarPlan = (plan) => {
+    if (plan.tipo === "funcional") return PF.normalizarFuncional(plan);
     plan.opciones = Object.assign({}, PF.OPCIONES_BASE, plan.opciones || {});
     plan.fases = plan.fases || []; plan.sesiones = plan.sesiones || []; plan.semInfo = plan.semInfo || []; plan.recomendaciones = plan.recomendaciones || [];
     plan.semanas = Math.max(1, Math.min(MAX_SEMANAS, Math.round(+plan.semanas || 1)));
@@ -297,7 +391,7 @@
     copia.semanaManual = null;
     copia.inicio = PF.hoyISO();
     for (const f of copia.fases) f.id = PF.id();
-    for (const s of copia.sesiones) { s.id = PF.id(); for (const e of s.ejercicios) e.id = PF.id(); }
+    for (const s of copia.sesiones) { s.id = PF.id(); for (const e of (s.ejercicios || [])) e.id = PF.id(); for (const b of (s.bloques || [])) { b.id = PF.id(); for (const e of b.ejercicios) e.id = PF.id(); } }
     return copia;
   };
 
