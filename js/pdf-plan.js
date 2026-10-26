@@ -121,39 +121,62 @@
 
       // ---- datos ----
       const meses = Math.round((plan.semanas / 4.345) * 10) / 10;
-      const tiles = [
-        ["EDAD", cliente.edad ? `${cliente.edad} años` : "—"],
-        ["ALTURA", cliente.altura ? `${String(cliente.altura).replace(".", ",")} cm` : "—"],
-        ["PESO", cliente.peso ? `${String(cliente.peso).replace(".", ",")} kg` : "—"],
-        ["DURACIÓN", `${plan.semanas} sem`],
-      ];
-      const gap = 10, tw = (CW - gap * 3) / 4;
-      tiles.forEach((t, i) => {
-        const x = M + i * (tw + gap);
-        p.rect(x, y, tw, 56, { fill: FONDO, r: 12 });
-        p.text(t[0], x + 13, y + 12, { size: 6.5, font: "b", color: GRIS, spacing: 1.3 });
-        p.text(t[1], x + 13, y + 27, { size: 15.5, color: TINTA });
-        if (i === 3 && plan.semanas >= 6) p.text(`≈ ${String(meses).replace(".", ",")} meses`, x + 13, y + 45, { size: 7.5, color: GRIS });
-      });
+      const gap = 10;
+      if (cliente.esGrupo) {
+        const tw1 = (CW - gap * 3) / 4;
+        const wide = tw1 * 3 + gap * 2;
+        p.rect(M, y, wide, 56, { fill: FONDO, r: 12 });
+        p.text("PARTICIPANTES", M + 13, y + 12, { size: 6.5, font: "b", color: GRIS, spacing: 1.3 });
+        p.text(cliente.participantes || "—", M + 13, y + 27, { size: 15.5, color: TINTA });
+        const xd = M + wide + gap;
+        p.rect(xd, y, tw1, 56, { fill: FONDO, r: 12 });
+        p.text("DURACIÓN", xd + 13, y + 12, { size: 6.5, font: "b", color: GRIS, spacing: 1.3 });
+        p.text(`${plan.semanas} sem`, xd + 13, y + 27, { size: 15.5, color: TINTA });
+        if (plan.semanas >= 6) p.text(`≈ ${String(meses).replace(".", ",")} meses`, xd + 13, y + 45, { size: 7.5, color: GRIS });
+      } else {
+        const tiles = [
+          ["EDAD", cliente.edad ? `${cliente.edad} años` : "—"],
+          ["ALTURA", cliente.altura ? `${String(cliente.altura).replace(".", ",")} cm` : "—"],
+          ["PESO", cliente.peso ? `${String(cliente.peso).replace(".", ",")} kg` : "—"],
+          ["DURACIÓN", `${plan.semanas} sem`],
+        ];
+        const tw = (CW - gap * 3) / 4;
+        tiles.forEach((t, i) => {
+          const x = M + i * (tw + gap);
+          p.rect(x, y, tw, 56, { fill: FONDO, r: 12 });
+          p.text(t[0], x + 13, y + 12, { size: 6.5, font: "b", color: GRIS, spacing: 1.3 });
+          p.text(t[1], x + 13, y + 27, { size: 15.5, color: TINTA });
+          if (i === 3 && plan.semanas >= 6) p.text(`≈ ${String(meses).replace(".", ",")} meses`, x + 13, y + 45, { size: 7.5, color: GRIS });
+        });
+      }
       y += 56 + 12;
 
-      const colW = (CW - gap) / 2;
       const objetivos = cliente.objetivos || "—";
-      const hayLes = !!cliente.lesiones;
-      const lesiones = cliente.lesiones || "Sin lesiones ni limitaciones indicadas";
-      const hO = p.alturaBloque(objetivos, colW - 30, 9.5, "r", 13);
-      const hL = p.alturaBloque(lesiones, colW - 30, 9.5, "r", 13);
-      const hc = Math.max(62, 36 + Math.max(hO, hL));
+      if (cliente.esGrupo) {
+        const hO = p.alturaBloque(objetivos, CW - 30, 9.5, "r", 13);
+        const hc = Math.max(62, 36 + hO);
+        p.rect(M, y, CW, hc, { fill: FONDO, r: 12 });
+        p.text("OBJETIVOS DEL GRUPO", M + 15, y + 14, { size: 6.8, font: "b", color: GRIS, spacing: 1.3 });
+        p.bloque(objetivos, M + 15, y + 31, CW - 30, { size: 9.5, color: TINTA, lh: 13 });
+        y += hc + 28;
+      } else {
+        const colW = (CW - gap) / 2;
+        const hayLes = !!cliente.lesiones;
+        const lesiones = cliente.lesiones || "Sin lesiones ni limitaciones indicadas";
+        const hO = p.alturaBloque(objetivos, colW - 30, 9.5, "r", 13);
+        const hL = p.alturaBloque(lesiones, colW - 30, 9.5, "r", 13);
+        const hc = Math.max(62, 36 + Math.max(hO, hL));
 
-      p.rect(M, y, colW, hc, { fill: FONDO, r: 12 });
-      p.text("OBJETIVOS", M + 15, y + 14, { size: 6.8, font: "b", color: GRIS, spacing: 1.3 });
-      p.bloque(objetivos, M + 15, y + 31, colW - 30, { size: 9.5, color: TINTA, lh: 13 });
+        p.rect(M, y, colW, hc, { fill: FONDO, r: 12 });
+        p.text("OBJETIVOS", M + 15, y + 14, { size: 6.8, font: "b", color: GRIS, spacing: 1.3 });
+        p.bloque(objetivos, M + 15, y + 31, colW - 30, { size: 9.5, color: TINTA, lh: 13 });
 
-      const x2 = M + colW + gap;
-      p.rect(x2, y, colW, hc, { fill: hayLes ? AMBAR_FONDO : FONDO, r: 12 });
-      p.text("LESIONES Y LIMITACIONES", x2 + 15, y + 14, { size: 6.8, font: "b", color: hayLes ? AMBAR : GRIS, spacing: 1.3 });
-      p.bloque(lesiones, x2 + 15, y + 31, colW - 30, { size: 9.5, color: hayLes ? TINTA : GRIS2, lh: 13 });
-      y += hc + 28;
+        const x2 = M + colW + gap;
+        p.rect(x2, y, colW, hc, { fill: hayLes ? AMBAR_FONDO : FONDO, r: 12 });
+        p.text("LESIONES Y LIMITACIONES", x2 + 15, y + 14, { size: 6.8, font: "b", color: hayLes ? AMBAR : GRIS, spacing: 1.3 });
+        p.bloque(lesiones, x2 + 15, y + 31, colW - 30, { size: 9.5, color: hayLes ? TINTA : GRIS2, lh: 13 });
+        y += hc + 28;
+      }
 
       // ---- gráfica ----
       y = titulo("Mapa del plan", y, `${plan.semanas} semanas`);

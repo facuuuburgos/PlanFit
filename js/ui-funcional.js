@@ -255,6 +255,7 @@
         <header class="fx-ses-cab">
           ${s.dia ? `<span class="fx-dia">${h(s.dia.slice(0, 3).toUpperCase())}</span>` : ""}
           <button class="fx-ses-t" data-edit-ses="${si}"><b>${h(s.nombre || "Sesión " + (si + 1))}</b><small>${[s.foco, `${s.bloques.length} ${s.bloques.length === 1 ? "bloque" : "bloques"}`, dm ? `≈ ${dm} min` : ""].filter(Boolean).map(h).join(" · ")}</small></button>
+          ${s.bloques.length ? `<a class="icono" href="#/p/${plan.id}/entrenar/${si}" aria-label="Entrenar esta sesión" title="Entrenar">${UI.ic("play")}</a>` : ""}
           <button class="icono" data-menu-ses="${si}" aria-label="Más opciones">${UI.ic("dots")}</button>
         </header>
         ${s.calentamiento ? `<p class="fx-cal">${UI.ic("flame")}<span>${h(s.calentamiento)}</span></p>` : ""}

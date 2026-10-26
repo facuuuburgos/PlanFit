@@ -162,9 +162,13 @@
 
     function medirPortada(p) {
       const datos = [];
-      if (cliente.edad) datos.push(["EDAD", `${cliente.edad} años`]);
-      if (cliente.altura) datos.push(["ALTURA", `${cliente.altura} cm`]);
-      if (cliente.peso) datos.push(["PESO", `${String(cliente.peso).replace(".", ",")} kg`]);
+      if (cliente.esGrupo) {
+        if (cliente.participantes) datos.push(["PARTICIPANTES", cliente.participantes]);
+      } else {
+        if (cliente.edad) datos.push(["EDAD", `${cliente.edad} años`]);
+        if (cliente.altura) datos.push(["ALTURA", `${cliente.altura} cm`]);
+        if (cliente.peso) datos.push(["PESO", `${String(cliente.peso).replace(".", ",")} kg`]);
+      }
       const obj = (cliente.objetivos || "").trim(), les = (cliente.lesiones || "").trim();
       const hObj = obj ? p.alturaBloque(obj, (CW - 12) / 2 - 24, 8.5, "r", 11.5) : 0;
       const hLes = les ? p.alturaBloque(les, (CW - 12) / 2 - 24, 8.5, "r", 11.5) : 0;

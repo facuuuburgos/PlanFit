@@ -1,12 +1,12 @@
 /* PlanFit · service worker: funciona sin conexión y avisa cuando hay versión nueva.
    IMPORTANTE: cada vez que cambies cualquier archivo, sube el número de VERSION. */
-const VERSION = "1.11.0";
+const VERSION = "1.12.0";
 const CACHE = "planfit-" + VERSION;
 
 const ARCHIVOS = [
   "./", "index.html", "styles.css", "manifest.webmanifest",
   "js/data.js", "js/store.js", "js/pdf-lib.js", "js/pdf-plan.js", "js/pdf-func.js",
-  "js/ui-base.js", "js/ui-grafica.js", "js/ui-editor.js", "js/ui-vistas.js", "js/ui-funcional.js", "js/ui-extra.js", "js/app.js",
+  "js/ui-base.js", "js/ui-grafica.js", "js/ui-editor.js", "js/ui-vistas.js", "js/ui-funcional.js", "js/ui-extra.js", "js/ui-entrenar.js", "js/app.js",
   "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png", "icons/apple-touch-icon.png",
 ];
 

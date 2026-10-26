@@ -57,8 +57,8 @@
 
   /* ---------- creación ---------- */
 
-  PF.nuevoCliente = () => ({
-    id: PF.id(), nombre: "", edad: "", altura: "", peso: "", lesiones: "", objetivos: "", notas: "", creado: Date.now(),
+  PF.nuevoCliente = (esGrupo = false) => ({
+    id: PF.id(), nombre: "", esGrupo: !!esGrupo, participantes: "", edad: "", altura: "", peso: "", lesiones: "", objetivos: "", notas: "", creado: Date.now(),
   });
 
   PF.semanaVacia = () => ({ s: 3, r: "10", d: 60, i: null, rpe: "" });

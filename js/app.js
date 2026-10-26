@@ -3,7 +3,7 @@
   "use strict";
 
   const UI = root.UI, PF = root.PF, D = root.PF_DATA, Store = PF.Store, h = UI.h, $ = UI.$, $$ = UI.$$;
-  UI.VERSION = "1.11.0";
+  UI.VERSION = "1.12.0";
   UI.lateralOculto = () => { try { return localStorage.getItem("planfit.lateralOculto") === "1"; } catch (e) { return false; } };
 
   const ancho = () => matchMedia("(min-width: 900px)").matches;
@@ -13,6 +13,7 @@
   function ruta() {
     const p = (location.hash || "#/").replace(/^#\/?/, "").split("/");
     if (p[0] === "c" && p[1]) return { n: "cliente", id: p[1] };
+    if (p[0] === "p" && p[1] && p[2] === "entrenar") return { n: "entrenar", id: p[1], si: parseInt(p[3], 10) || 0 };
     if (p[0] === "p" && p[1]) return { n: "plan", id: p[1] };
     if (p[0] === "ajustes") return { n: "ajustes" };
     if (p[0] === "planes") return { n: "planes" };
@@ -44,6 +45,7 @@
 
     if (r.n === "clientes") vista = ancho() ? UI.vistas.inicioAncho() : UI.vistas.clientes();
     else if (r.n === "cliente") vista = UI.vistas.cliente(r);
+    else if (r.n === "entrenar") vista = UI.vistas.entrenar(r);
     else if (r.n === "plan") vista = (Store.plan(r.id) || {}).tipo === "funcional" ? UI.vistas.funcional(r) : UI.vistas.plan(r);
     else if (r.n === "planes") vista = UI.vistas.planes();
     else if (r.n === "biblioteca") vista = UI.vistas.biblioteca();
@@ -78,7 +80,7 @@
           <h1>${h(vista.titulo)}${vista.sub ? `<span class="sub">${h(vista.sub)}</span>` : ""}</h1>
           ${vista.acciones || ""}
         </header>
-        <main class="contenido ${r.n === "plan" ? "ancho" : ""} ${r.n === "plan" && esFx ? "fx-pag" : ""} ${UI.amplia() && !esFx && (r.n === "plan" || r.n === "cliente") ? "amplio" : ""}" id="main">${vista.html}</main>
+        <main class="contenido ${r.n === "plan" ? "ancho" : ""} ${r.n === "plan" && esFx ? "fx-pag" : ""} ${r.n === "entrenar" ? "entrenar" : ""} ${UI.amplia() && !esFx && (r.n === "plan" || r.n === "cliente") ? "amplio" : ""}" id="main">${vista.html}</main>
       </div>`;
 
     const tab = `
@@ -91,6 +93,7 @@
 
     $("#app").innerHTML = lateral + principal + tab;
     $("#app").classList.toggle("lat-oculto", UI.lateralOculto());
+    $("#app").classList.toggle("modo-entrenar", r.n === "entrenar");
     if (vista.bind) vista.bind($("#main"));
 
     if (conservarScroll) {
@@ -188,16 +191,29 @@
 
   const ACCIONES = {
     "nuevo-cliente"() {
+      let esGrupo = false;
       const hoja = UI.hoja({
         titulo: "Nuevo cliente", clase: "dialogo",
-        html: `<label class="campo"><span>Nombre y apellido</span><input id="nc-nombre" placeholder="Ej.: Lucía Fernández" autocapitalize="words" autocomplete="off"></label><p class="ayuda">Después podrás completar edad, medidas, objetivos y lesiones.</p>`,
+        html: `<div class="seg" style="margin-bottom:14px">
+            <button data-tipo-cliente="0" class="on">Cliente individual</button>
+            <button data-tipo-cliente="1">Grupo / clase</button>
+          </div>
+          <label class="campo"><span id="nc-lbl">Nombre y apellido</span><input id="nc-nombre" placeholder="Ej.: Lucía Fernández" autocapitalize="words" autocomplete="off"></label>
+          <p class="ayuda" id="nc-ayuda">Después podrás completar edad, medidas, objetivos y lesiones.</p>`,
         pie: `<button class="btn" data-cerrar>Cancelar</button><button class="btn primario" id="nc-ok">Crear cliente</button>`,
         alAbrir: (hh) => setTimeout(() => { const i = $("#nc-nombre", hh.el); i && i.focus(); }, 320),
       });
+      $$("[data-tipo-cliente]", hoja.el).forEach((b) => b.addEventListener("click", () => {
+        esGrupo = b.dataset.tipoCliente === "1";
+        $$("[data-tipo-cliente]", hoja.el).forEach((x) => x.classList.toggle("on", x === b));
+        $("#nc-lbl", hoja.el).textContent = esGrupo ? "Nombre del grupo o clase" : "Nombre y apellido";
+        $("#nc-nombre", hoja.el).placeholder = esGrupo ? "Ej.: Clase de las 18 hs" : "Ej.: Lucía Fernández";
+        $("#nc-ayuda", hoja.el).textContent = esGrupo ? "Después podrás indicar cuántos participantes son y sus objetivos." : "Después podrás completar edad, medidas, objetivos y lesiones.";
+      }));
       const crear = () => {
         const nombre = $("#nc-nombre", hoja.el).value.trim();
-        if (!nombre) { UI.aviso("Escribe el nombre del cliente", { error: true }); $("#nc-nombre", hoja.el).focus(); return; }
-        const c = PF.nuevoCliente(); c.nombre = nombre;
+        if (!nombre) { UI.aviso(esGrupo ? "Escribe el nombre del grupo o clase" : "Escribe el nombre del cliente", { error: true }); $("#nc-nombre", hoja.el).focus(); return; }
+        const c = PF.nuevoCliente(esGrupo); c.nombre = nombre;
         Store.datos.clientes.push(c); Store.guardar();
         hoja.cerrar(); UI.nav("#/c/" + c.id);
       };

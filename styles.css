@@ -743,3 +743,77 @@ button.icono.chev { color: var(--txt2); }
 .fx-ok { background: linear-gradient(135deg, #2FE0C8, #0FB8A6) !important; color: #04302C !important; }
 .fx-hoja .hoja-cuerpo { padding-bottom: 6px; }
 @media (prefers-reduced-motion: reduce) { .fx-bl, .fx-ej, .fx-tipo, .acc, .fx-ses { animation: none !important; } }
+
+/* ============ avatar de grupo / clase ============ */
+.avatar.grupo { border-radius: 14px; }
+.avatar.grupo svg { width: 20px; height: 20px; }
+.pildora.acento { background: var(--acento-suave); color: var(--acento); }
+.pildora.acento svg { width: 13px; height: 13px; margin-right: 1px; }
+
+/* ============ modo ENTRENAR: pantalla a pantalla completa, sin distracciones ============ */
+.modo-entrenar .lateral, .modo-entrenar .tabbar, .modo-entrenar .barra-sup, .modo-entrenar .btn-lateral { display: none !important; }
+.modo-entrenar .principal { height: 100%; }
+.contenido.entrenar { max-width: 640px; padding: 0; margin: 0 auto; }
+
+.ent-pantalla { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; background: var(--bg); }
+
+.ent-top { display: flex; align-items: center; gap: 10px; padding: calc(var(--sup) + 10px) 10px 8px 6px; }
+.ent-top .icono { color: var(--txt2); }
+.ent-top-t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ent-top-t b { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ent-top-t span { font-size: 12px; color: var(--txt2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ent-top-n { flex: none; font-size: 13px; font-weight: 700; color: var(--txt2); font-variant-numeric: tabular-nums; padding-right: 6px; }
+
+.ent-dots { display: flex; gap: 6px; padding: 2px 16px 10px; overflow-x: auto; scrollbar-width: none; }
+.ent-dots::-webkit-scrollbar { display: none; }
+.ent-dots button { flex: none; width: 10px; height: 10px; border-radius: 99px; border: 0; background: var(--relleno2); padding: 0; transition: transform .25s var(--resorte), background .2s; }
+.ent-dots button.on { background: var(--acento); transform: scale(1.3); }
+
+.ent-cuerpo { flex: 1; display: flex; align-items: flex-start; justify-content: center; padding: 6px 16px; }
+
+.ent-card { width: 100%; max-width: 560px; background: var(--card); border-radius: 22px; padding: 22px 20px; box-shadow: var(--sombra); display: flex; flex-direction: column; gap: 4px; animation: entra .4s var(--suave) both; }
+.ent-card h1 { font-size: 26px; line-height: 1.2; margin: 4px 0 10px; }
+.ent-card .pildora { align-self: flex-start; margin-bottom: 8px; }
+.ent-grande { display: flex; align-items: baseline; gap: 8px; font-size: 56px; font-weight: 800; line-height: 1; color: var(--acento); margin: 2px 0 14px; font-variant-numeric: tabular-nums; }
+.ent-grande small { font-size: 15px; font-weight: 700; color: var(--txt2); }
+.ent-filas { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-bottom: 8px; }
+.ent-filas > div { display: flex; flex-direction: column; }
+.ent-filas b { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.ent-filas span { font-size: 11.5px; color: var(--txt2); text-transform: uppercase; letter-spacing: .03em; }
+.ent-nota { color: var(--txt2); font-size: 13.5px; line-height: 1.4; margin: 6px 0 4px; }
+.ent-card .btn { margin-top: 10px; }
+.ent-func .pildora.acento { color: var(--fx, var(--acento)); background: color-mix(in srgb, var(--fx, var(--acento)) 16%, transparent); }
+.ent-lista { list-style: none; margin: 4px 0 2px; padding: 0; display: grid; gap: 7px; }
+.ent-lista li { display: flex; align-items: baseline; gap: 10px; font-size: 15px; flex-wrap: wrap; }
+.ent-lista b { flex: none; min-width: 52px; color: var(--fx, var(--acento)); font-weight: 800; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.ent-lista span { font-weight: 650; }
+.ent-lista em { font-style: normal; color: var(--txt3); font-size: 12px; }
+.ent-lista small { color: var(--txt3); font-size: 11.5px; width: 100%; }
+
+.ent-nav { display: flex; gap: 10px; padding: 10px 16px 14px; max-width: 560px; margin: 0 auto; width: 100%; box-sizing: border-box; }
+.ent-nav .btn { flex: 1; justify-content: center; }
+.ent-nav a.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+
+.ent-tmr { position: sticky; bottom: 0; z-index: 12; background: color-mix(in srgb, var(--card) 88%, transparent); backdrop-filter: saturate(1.8) blur(20px); -webkit-backdrop-filter: saturate(1.8) blur(20px); border-top: 1px solid var(--linea); padding: 8px 14px calc(10px + var(--inf)); box-shadow: 0 -8px 26px -12px rgba(12,17,34,.3); }
+.ent-tmr-barra { height: 3px; border-radius: 99px; background: var(--relleno2); overflow: hidden; margin-bottom: 8px; }
+#tmr-prog { height: 100%; width: 0; background: var(--acento); transition: width .9s linear; }
+.ent-tmr-fila { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.ent-tmr-info { display: flex; flex-direction: column; min-width: 0; }
+#tmr-fase { font-size: 12.5px; font-weight: 700; color: var(--txt2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#tmr-pasos { font-size: 11px; color: var(--txt3); }
+.ent-tmr-reloj { font-size: 34px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+.ent-tmr.activo .ent-tmr-reloj { color: var(--acento); }
+.ent-tmr-ctrl { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 8px 0 8px; }
+.ent-tmr-play { width: 60px; height: 60px; border-radius: 99px; border: 0; background: var(--acento); color: #fff; display: grid; place-items: center; box-shadow: 0 6px 18px -4px color-mix(in srgb, var(--acento) 70%, transparent); transition: transform .2s var(--resorte); }
+.ent-tmr-play:active { transform: scale(.92); }
+.ent-tmr-play svg { width: 26px; height: 26px; }
+.ent-tmr-ctrl .btn.chico { min-width: 52px; justify-content: center; }
+.ent-tmr-chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.ent-tmr-chips::-webkit-scrollbar { display: none; }
+.ent-tmr-chips .chip { flex: none; }
+
+@media (min-width: 900px) {
+  .ent-pantalla { max-width: 640px; margin: 0 auto; }
+  .contenido.entrenar { padding-bottom: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .ent-card, .ent-dots button { animation: none !important; transition: none !important; } }

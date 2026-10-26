@@ -41,8 +41,8 @@
         const p = planes[0];
         const sub = p ? `${p.titulo} · ${faseTexto(p)}` : "Sin planes todavía";
         return `<a class="fila ${c.id === activo ? "on" : ""}" href="#/c/${c.id}">
-          <span class="avatar" style="background:${UI.colorAvatar(c.nombre + c.id)}">${h(UI.iniciales(c.nombre))}</span>
-          <span class="t"><b>${h(c.nombre || "Cliente sin nombre")}</b><span>${h(sub)}</span></span>
+          <span class="avatar ${c.esGrupo ? "grupo" : ""}" style="background:${UI.colorAvatar(c.nombre + c.id)}">${c.esGrupo ? UI.ic("users") : h(UI.iniciales(c.nombre))}</span>
+          <span class="t"><b>${h(c.nombre || (c.esGrupo ? "Grupo sin nombre" : "Cliente sin nombre"))}</b><span>${h(sub)}</span></span>
           ${planes.length > 1 ? `<span class="pildora">${planes.length} planes</span>` : ""}
           ${UI.ic("right", "flecha")}</a>`;
       }).join("") + (lista.length ? "" : `<p class="vacio">Sin resultados</p>`);
@@ -122,7 +122,15 @@
 
     const objetivos = D.OBJETIVOS_SUGERIDOS.map((o) => `<button class="chip" data-obj="${h(o)}">${h(o)}</button>`).join("");
 
-    const datosHtml = `
+    const datosHtml = c.esGrupo ? `
+        <div class="titulo-sec">Datos del grupo <span class="pildora acento">${UI.ic("users")}Grupo / clase</span></div>
+        <div class="tarjeta">
+          ${campo("Nombre del grupo o clase", "c:nombre", c.nombre, 'placeholder="Ej.: Clase de las 18 hs" autocapitalize="words" autocomplete="off"')}
+          ${campo("Participantes", "c:participantes", c.participantes, 'placeholder="Ej.: 8 a 10 personas, nivel intermedio"')}
+          <label class="campo"><span>Objetivos</span><textarea data-b="c:objetivos" placeholder="¿Qué busca lograr el grupo?">${h(c.objetivos)}</textarea></label>
+          <div class="chips scroll">${objetivos}</div>
+          <label class="campo"><span>Notas privadas (no salen en el PDF)</span><textarea data-b="c:notas" placeholder="Horarios, lugar, preferencias…">${h(c.notas)}</textarea></label>
+        </div>` : `
         <div class="titulo-sec">Datos del cliente</div>
         <div class="tarjeta">
           ${campo("Nombre y apellido", "c:nombre", c.nombre, 'placeholder="Ej.: Lucía Fernández" autocapitalize="words" autocomplete="off"')}
@@ -148,7 +156,7 @@
         }).join("") : `<div class="tarjeta" style="text-align:center;color:var(--txt2)">Este cliente todavía no tiene planes.<br><br><button class="btn primario" data-act="nuevo-plan">${UI.ic("plus")}Crear el primer plan</button></div>`}`;
 
     return {
-      titulo: c.nombre || "Nuevo cliente", sub: planes.length ? `${planes.length} ${planes.length === 1 ? "plan" : "planes"}` : "", atras: "#/",
+      titulo: c.nombre || (c.esGrupo ? "Nuevo grupo" : "Nuevo cliente"), sub: planes.length ? `${planes.length} ${planes.length === 1 ? "plan" : "planes"}` : "", atras: "#/",
       acciones: `<button class="icono" data-act="menu-cliente" aria-label="Más opciones">${UI.ic("dots")}</button>`,
       html: UI.amplia()
         ? `<div class="dos-col igual"><div>${datosHtml}</div><div>${planesHtml}</div></div>`
@@ -374,6 +382,7 @@
         <div class="sesion-cab">
           ${dia ? `<span class="dia">${h(dia)}</span>` : ""}
           <button class="t" data-tog-ses="${s.id}" style="border:0;background:none;text-align:left;padding:0" aria-expanded="${abierta}"><b>${h(s.nombre || "Sesión " + (si + 1))}</b><span data-resumen="${si}">${vis.length} ${vis.length === 1 ? "ejercicio" : "ejercicios"} · ${total} series${s.foco ? " · " + h(s.foco) : ""}</span></button>
+          ${vis.length ? `<a class="icono" href="#/p/${plan.id}/entrenar/${si}" aria-label="Entrenar esta sesión" title="Entrenar">${UI.ic("play")}</a>` : ""}
           <button class="icono" data-menu-ses="${si}" aria-label="Opciones de la sesión">${UI.ic("dots")}</button>
           <button class="icono chev ${abierta ? "abierta" : ""}" data-tog-ses="${s.id}" aria-label="${abierta ? "Contraer" : "Expandir"}">${UI.ic("down")}</button>
         </div>
