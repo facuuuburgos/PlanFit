@@ -3,7 +3,7 @@
   "use strict";
 
   const UI = root.UI, PF = root.PF, D = root.PF_DATA, Store = PF.Store, h = UI.h, $ = UI.$, $$ = UI.$$;
-  UI.VERSION = "1.12.0";
+  UI.VERSION = "1.13.0";
   UI.lateralOculto = () => { try { return localStorage.getItem("planfit.lateralOculto") === "1"; } catch (e) { return false; } };
 
   const ancho = () => matchMedia("(min-width: 900px)").matches;
