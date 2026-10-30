@@ -1,4 +1,4 @@
-/* Hojas de edición: ejercicio (con evolución semanal), progresión rápida y sesión. */
+/* Hojas de edición: ejercicio (valores de esta semana, independiente del resto) y sesión. */
 (function (root) {
   "use strict";
 
@@ -22,53 +22,14 @@
     if (!existe && !d.ejerciciosPropios.some((x) => norm(x) === norm(n))) { d.ejerciciosPropios.push(n); }
   };
 
-  const CAMPOS = [
-    { id: "s", nombre: "Series", mode: "numeric" },
-    { id: "r", nombre: "Repeticiones", mode: "text" },
-    { id: "d", nombre: "Descanso (segundos)", mode: "numeric" },
-    { id: "i", nombre: "Intensidad (%)", mode: "decimal" },
-    { id: "rpe", nombre: "RPE", mode: "decimal" },
-  ];
-
   /* ============ EJERCICIO ============ */
 
   // existente: ejercicio a editar (se trabaja sobre una copia) o null para crear. alGuardar(ej)
-  // ctx.semana = semana que se está viendo; alReemplazar(nuevoEj, quitarViejo) se usa al «Cambiar por otro ejercicio».
-  UI.editarEjercicio = (plan, existente, alGuardar, alEliminar, ctx = {}, alReemplazar) => {
-    const borrador = existente ? JSON.parse(JSON.stringify(existente)) : PF.nuevoEjercicio("", plan.semanas);
+  // Los valores (series, reps, descanso, intensidad, rpe) pertenecen solo a esta semana: no afectan a otras.
+  UI.editarEjercicio = (plan, existente, alGuardar, alEliminar) => {
+    const borrador = existente ? JSON.parse(JSON.stringify(existente)) : PF.nuevoEjercicio("");
     const nuevo = !existente;
-    const n = plan.semanas;
-    const wRef = Math.max(1, Math.min(n, ctx.semana || 1));
-    const rangoFase = (w) => { const f = PF.faseDeSemana(plan, w); return f ? { d: f.desde, h: f.hasta } : { d: 1, h: n }; };
-    const rango = (d, hh) => Array.from({ length: hh - d + 1 }, (_, i) => d + i);
-    const rangos = PF.rangosFases(plan);
-    const variasFases = rangos.length > 1;
-    // un ejercicio nuevo aparece solo en la fase que se está viendo (no se copia solo a las demás fases)
-    if (nuevo && variasFases) { const f = PF.faseDeSemana(plan, wRef); if (f) borrador.fases = [f.fase.id]; }
-    PF.sincEj(plan, rangos, borrador);
-    const idsFases = () => Array.isArray(borrador.fases) ? borrador.fases : rangos.map((r) => r.fase.id);
-    const chipsFases = () => rangos.map((r) => `<button class="chip ${idsFases().includes(r.fase.id) ? "on" : ""}" data-fase-id="${r.fase.id}"><i class="punto" style="background:${r.fase.color}"></i>${h(r.fase.nombre)}</button>`).join("");
     const rpe = plan.opciones.rpe;
-
-    const filas = () => {
-      let out = "";
-      for (let w = 1; w <= n; w++) {
-        if (!PF.activo(borrador, w)) continue;
-        const c = borrador.sem[w - 1];
-        const f = PF.faseDeSemana(plan, w);
-        const desc = plan.semInfo[w - 1] && plan.semInfo[w - 1].descarga;
-        out += `<tr class="${desc ? "desc" : ""}" data-w="${w}">
-          <td class="sem"><i class="punto" style="background:${f ? f.fase.color : "#C9D0DE"}"></i> S${w}</td>
-          <td><input data-c="s" inputmode="numeric" value="${h(c.s)}"></td>
-          <td><input data-c="r" inputmode="text" value="${h(c.r)}"></td>
-          <td><input data-c="d" inputmode="numeric" value="${h(c.d)}"></td>
-          <td><input data-c="i" inputmode="decimal" value="${h(c.i ?? "")}" placeholder="–"></td>
-          ${rpe ? `<td><input data-c="rpe" inputmode="decimal" value="${h(c.rpe ?? "")}" placeholder="–"></td>` : ""}
-          <td><button class="abajo" data-abajo="${w}" title="Copiar esta semana hacia abajo">${UI.ic("arrowdown")}</button></td>
-        </tr>`;
-      }
-      return out;
-    };
 
     const grupos = Object.keys(D.BIBLIOTECA);
 
@@ -83,14 +44,17 @@
       <p class="ayuda">«Máximo» es la repetición máxima del cliente en este ejercicio. Si la indicas, el PDF muestra los kilos aproximados según el %.</p>
       <label class="campo"><span>Nota para el cliente (opcional)</span><input id="e-nota" value="${h(borrador.nota)}" placeholder="Ej.: Controla la bajada, profundidad hasta paralelo"></label>
 
-      ${variasFases ? `<div class="titulo-sec" style="margin-top:6px">Aparece en estas fases</div><div class="chips" id="e-fases">${chipsFases()}</div><p class="ayuda">Dentro de una fase el ejercicio se mantiene en todas sus semanas. Activa otra fase para repetirlo ahí.</p>` : ""}
-      <div class="titulo-sec" style="margin-top:6px">Evolución semana a semana
-        <span class="der"><button class="btn chico suave" id="e-prog">${UI.ic("wand")}Progresión rápida</button></span></div>
-      <table class="tabla-sem">
-        <thead><tr><th></th><th>Series</th><th>Reps</th><th>Desc. s</th><th>%</th>${rpe ? "<th>RPE</th>" : ""}<th></th></tr></thead>
-        <tbody id="e-filas">${filas()}</tbody>
-      </table>
-      <p class="ayuda">Las filas en color cálido son semanas de descarga. La flecha ↓ copia esa semana hacia abajo hasta el final de la fase.</p>
+      <div class="titulo-sec" style="margin-top:6px">Valores de esta semana</div>
+      <div class="cols3">
+        <label class="campo"><span>Series</span><input id="e-s" inputmode="numeric" value="${h(borrador.s)}"></label>
+        <label class="campo"><span>Repeticiones</span><input id="e-r" value="${h(borrador.r)}"></label>
+        <label class="campo"><span>Descanso (s)</span><input id="e-d" inputmode="numeric" value="${h(borrador.d)}"></label>
+      </div>
+      <div class="cols2">
+        <label class="campo"><span>Intensidad (%)</span><input id="e-i" inputmode="decimal" value="${h(borrador.i ?? "")}" placeholder="–"></label>
+        ${rpe ? `<label class="campo"><span>RPE</span><input id="e-rpe" inputmode="decimal" value="${h(borrador.rpe ?? "")}" placeholder="–"></label>` : ""}
+      </div>
+      <p class="ayuda">Estos valores son solo de esta semana. Para que otra semana tenga lo mismo, usa «Copiar otra semana aquí» y luego ajusta lo que necesites.</p>
       ${nuevo ? "" : `<div class="espacio"></div><button class="btn peligro bloque" id="e-borrar">${UI.ic("trash")}Eliminar ejercicio</button>`}
     `;
 
@@ -100,20 +64,6 @@
       alAbrir: (hh) => { if (nuevo) setTimeout(() => $("#e-nombre", hh.el).focus(), 300); },
     });
     const el = hoja.el;
-
-    const refrescarFilas = () => { $("#e-filas", el).innerHTML = filas(); };
-
-    refrescarFilas();
-
-    const cf = $("#e-fases", el);
-    if (cf) cf.addEventListener("click", (ev) => {
-      const b = ev.target.closest("[data-fase-id]"); if (!b) return;
-      const id = b.dataset.faseId, act = idsFases();
-      const nuevoSet = act.includes(id) ? act.filter((x) => x !== id) : [...act, id];
-      if (!nuevoSet.length) { UI.aviso("Debe aparecer en al menos una fase", { error: true }); return; }
-      borrador.fases = nuevoSet; PF.sincEj(plan, rangos, borrador);
-      cf.innerHTML = chipsFases(); refrescarFilas();
-    });
 
     /* sugerencias */
     const nom = $("#e-nombre", el);
@@ -136,28 +86,12 @@
     }
     $("#e-rm", el).addEventListener("input", (e) => { borrador.rm = PF.num(e.target.value); });
 
-    /* tabla */
-    $("#e-filas", el).addEventListener("input", (e) => {
-      const inp = e.target.closest("input[data-c]");
-      if (!inp) return;
-      const w = +inp.closest("tr").dataset.w, campo = inp.dataset.c, c = borrador.sem[w - 1];
-      if (campo === "s" || campo === "d") c[campo] = inp.value === "" ? "" : Math.max(0, Math.round(PF.num(inp.value) ?? 0));
-      else if (campo === "i") c.i = PF.num(inp.value);
-      else c[campo] = inp.value;
-    });
-
-    $("#e-filas", el).addEventListener("click", (e) => {
-      const b = e.target.closest("[data-abajo]");
-      if (!b) return;
-      const w = +b.dataset.abajo;
-      const info = PF.faseDeSemana(plan, w);
-      const hasta = info ? info.hasta : n;
-      for (let k = w + 1; k <= hasta; k++) borrador.sem[k - 1] = { ...borrador.sem[w - 1] };
-      refrescarFilas();
-      UI.aviso(hasta > w ? `Copiado a las semanas ${w + 1}–${hasta}` : "Es la última semana de la fase");
-    });
-
-    $("#e-prog", el).addEventListener("click", () => UI.progresionRapida(plan, borrador, refrescarFilas));
+    $("#e-s", el).addEventListener("input", (e) => { borrador.s = e.target.value === "" ? "" : Math.max(0, Math.round(PF.num(e.target.value) ?? 0)); });
+    $("#e-r", el).addEventListener("input", (e) => { borrador.r = e.target.value; });
+    $("#e-d", el).addEventListener("input", (e) => { borrador.d = e.target.value === "" ? "" : Math.max(0, Math.round(PF.num(e.target.value) ?? 0)); });
+    $("#e-i", el).addEventListener("input", (e) => { borrador.i = PF.num(e.target.value); });
+    const rpeInp = $("#e-rpe", el);
+    if (rpeInp) rpeInp.addEventListener("input", (e) => { borrador.rpe = e.target.value; });
 
     const borrar = $("#e-borrar", el);
     if (borrar) borrar.addEventListener("click", async () => {
@@ -170,119 +104,11 @@
       borrador.nombre = borrador.nombre.trim();
       if (!borrador.nombre) { UI.aviso("Escribe el nombre del ejercicio", { error: true }); $("#e-nombre", el).focus(); return; }
       borrador.super = String(borrador.super || "").trim().toUpperCase();
-      for (const c of borrador.sem) { if (c.s === "") c.s = 0; if (c.d === "") c.d = 0; }
+      if (borrador.s === "") borrador.s = 0;
+      if (borrador.d === "") borrador.d = 0;
       UI.recordarEjercicio(borrador.nombre);
       hoja.cerrar();
       alGuardar(borrador);
-    });
-  };
-
-  /* ============ CAMBIAR POR OTRO EJERCICIO ============ */
-
-  // Crea un ejercicio nuevo (con los mismos valores) para unas semanas y se las quita al actual.
-  UI.reemplazarEjercicio = (plan, ej, w, alAplicar) => {
-    const n = plan.semanas;
-    const fase = PF.faseDeSemana(plan, w);
-    const activas = PF.semanasActivas(ej, n);
-    const alcances = [
-      ["solo", `Solo la semana ${w}`, [w]],
-      ...(fase && plan.fases.length > 1 ? [["fase", `Esta fase (${fase.fase.nombre}, sem. ${fase.desde}–${fase.hasta})`, Array.from({ length: fase.hasta - fase.desde + 1 }, (_, i) => fase.desde + i)]] : []),
-      ["desde", `Desde la semana ${w} en adelante`, Array.from({ length: n - w + 1 }, (_, i) => w + i)],
-    ].map(([id, t, l]) => [id, t, l.filter((x) => activas.includes(x))]).filter(([, , l]) => l.length);
-    let sel = alcances.length > 1 ? alcances[1][0] : alcances[0] ? alcances[0][0] : "solo";
-
-    const hoja = UI.hoja({
-      titulo: "Cambiar por otro ejercicio", clase: "dialogo", fija: true,
-      html: `
-        <p>Reemplaza «${h(ej.nombre || "este ejercicio")}» por otro, conservando series, repeticiones e intensidad. El resto de las semanas queda como está.</p>
-        <label class="campo"><span>Nuevo ejercicio</span><input id="r-nombre" placeholder="Ej.: Sentadilla frontal" autocomplete="off" autocapitalize="sentences"></label>
-        <div id="r-sug"></div>
-        <div class="titulo-sec" style="margin-top:6px">¿Desde cuándo?</div>
-        <div class="lista-fases" id="r-alc">${alcances.map(([id, t, l]) => `<button class="fila-fase ${id === sel ? "on" : ""}" data-a="${id}"><span><b>${h(t)}</b><small>Semanas ${PF.textoSemanas(l)}</small></span></button>`).join("")}</div>`,
-      pie: `<button class="btn" data-cerrar>Cancelar</button><button class="btn primario" id="r-ok">Cambiar</button>`,
-      alAbrir: (hh) => setTimeout(() => $("#r-nombre", hh.el).focus(), 300),
-    });
-    const el = hoja.el, nom = $("#r-nombre", el);
-    nom.addEventListener("input", () => {
-      const sug = UI.sugerirEjercicios(nom.value);
-      $("#r-sug", el).innerHTML = sug.length ? `<div class="sugerencias">${sug.map((s, i) => `<button data-s="${i}">${h(s.n)}<small>${h(s.g)}</small></button>`).join("")}</div>` : "";
-      $("#r-sug", el).onclick = (e) => { const b = e.target.closest("[data-s]"); if (!b) return; nom.value = sug[+b.dataset.s].n; $("#r-sug", el).innerHTML = ""; };
-    });
-    $("#r-alc", el).addEventListener("click", (e) => {
-      const b = e.target.closest("[data-a]"); if (!b) return;
-      sel = b.dataset.a; $$("#r-alc .fila-fase", el).forEach((x) => x.classList.toggle("on", x === b));
-    });
-    $("#r-ok", el).addEventListener("click", () => {
-      const nombre = nom.value.trim();
-      if (!nombre) { UI.aviso("Escribe el nombre del nuevo ejercicio", { error: true }); nom.focus(); return; }
-      const semanas = (alcances.find((a) => a[0] === sel) || alcances[0])[2];
-      const nuevo = JSON.parse(JSON.stringify(ej));
-      nuevo.id = PF.id(); nuevo.nombre = nombre; nuevo.nota = ""; nuevo.tempo = ""; nuevo.rm = null; nuevo.super = ej.super || "";
-      PF.ponerActivas(nuevo, n, semanas);
-      const quedan = activas.filter((x) => !semanas.includes(x));
-      UI.recordarEjercicio(nombre);
-      hoja.cerrar();
-      alAplicar(nuevo, quedan);
-    });
-  };
-
-  /* ============ PROGRESIÓN RÁPIDA ============ */
-
-  UI.progresionRapida = (plan, ej, alAplicar) => {
-    const n = plan.semanas;
-    const opts = (sel) => Array.from({ length: n }, (_, i) => `<option value="${i + 1}" ${i + 1 === sel ? "selected" : ""}>Semana ${i + 1}</option>`).join("");
-
-    const hoja = UI.hoja({
-      titulo: "Progresión rápida", clase: "dialogo", fija: true,
-      html: `
-        <p>Rellena una columna de golpe: indica el valor de partida y cuánto cambia cada semana.</p>
-        <label class="campo"><span>¿Qué quieres progresar?</span>
-          <select id="p-campo">${CAMPOS.filter((c) => c.id !== "rpe" || plan.opciones.rpe).map((c) => `<option value="${c.id}" ${c.id === "i" ? "selected" : ""}>${c.nombre}</option>`).join("")}</select></label>
-        <div class="cols2">
-          <label class="campo"><span>Desde</span><select id="p-desde">${opts(1)}</select></label>
-          <label class="campo"><span>Hasta</span><select id="p-hasta">${opts(n)}</select></label>
-        </div>
-        <div class="cols2">
-          <label class="campo"><span>Valor inicial</span><input id="p-ini" inputmode="decimal"></label>
-          <label class="campo"><span>Cambio por semana</span><input id="p-paso" inputmode="decimal" value="2.5"></label>
-        </div>
-        <p class="ayuda" id="p-prev"></p>`,
-      pie: `<button class="btn" data-cerrar>Cancelar</button><button class="btn primario" id="p-ok">Aplicar</button>`,
-    });
-    const el = hoja.el;
-    const val = (id) => $("#" + id, el).value;
-
-    const valorDe = () => { const c = val("p-campo"), w = +val("p-desde"); const v = ej.sem[w - 1][c]; return v === null || v === undefined ? "" : String(v); };
-
-    const prev = () => {
-      const c = val("p-campo"), d = +val("p-desde"), hh = +val("p-hasta");
-      const ini = val("p-ini"), paso = PF.num(val("p-paso")) ?? 0;
-      if (hh < d || ini === "") { $("#p-prev", el).textContent = ""; return; }
-      const tmp = { sem: Array.from({ length: n }, () => ({ s: 0, r: "", d: 0, i: null, rpe: "" })) };
-      PF.progresion(tmp, c, d, hh, ini, paso);
-      const v = [d, Math.min(hh, d + 1), Math.min(hh, d + 2), hh].filter((x, i, a) => a.indexOf(x) === i).map((w) => `S${w}: ${c === "i" ? tmp.sem[w - 1][c] + "%" : tmp.sem[w - 1][c]}`);
-      $("#p-prev", el).textContent = `Quedará así → ${v.join("  ·  ")}`;
-    };
-
-    const poner = () => { $("#p-ini", el).value = valorDe(); prev(); };
-    $("#p-campo", el).addEventListener("change", () => {
-      const c = val("p-campo");
-      $("#p-paso", el).value = c === "i" ? "2.5" : c === "d" ? "0" : "1";
-      poner();
-    });
-    $("#p-desde", el).addEventListener("change", poner);
-    for (const id of ["p-hasta", "p-ini", "p-paso"]) $("#" + id, el).addEventListener("input", prev);
-    $("#p-hasta", el).addEventListener("change", prev);
-    poner();
-
-    $("#p-ok", el).addEventListener("click", () => {
-      const c = val("p-campo"), d = +val("p-desde"), hh = +val("p-hasta");
-      if (hh < d) { UI.aviso("«Hasta» debe ser igual o mayor que «Desde»", { error: true }); return; }
-      if (val("p-ini") === "") { UI.aviso("Indica el valor inicial", { error: true }); return; }
-      PF.progresion(ej, c, d, hh, val("p-ini"), PF.num(val("p-paso")) ?? 0);
-      hoja.cerrar();
-      alAplicar();
-      UI.aviso("Progresión aplicada");
     });
   };
 
@@ -290,7 +116,8 @@
 
   UI.editarSesion = (plan, ses, alGuardar, acciones = {}) => {
     const nuevo = !ses;
-    const b = ses ? { ...ses, ejercicios: ses.ejercicios } : PF.nuevaSesion(`Día ${plan.sesiones.length + 1}`);
+    const b = ses ? { ...ses } : PF.nuevaSesion(`Día ${plan.sesiones.length + 1}`, plan.semanas);
+    const totalEj = ses ? ses.semanas.reduce((a, wk) => a + wk.ejercicios.length, 0) : 0;
 
     const hoja = UI.hoja({
       titulo: nuevo ? "Nueva sesión" : "Editar sesión", fija: true,
@@ -317,7 +144,7 @@
     if (!nuevo) {
       $("#s-dup", el).addEventListener("click", () => { hoja.cerrar(); acciones.duplicar && acciones.duplicar(); });
       $("#s-del", el).addEventListener("click", async () => {
-        if (await UI.confirmar("Eliminar sesión", `¿Eliminar «${ses.nombre}» con sus ${ses.ejercicios.length} ejercicios?`, { si: "Eliminar", peligro: true })) { hoja.cerrar(); acciones.eliminar && acciones.eliminar(); }
+        if (await UI.confirmar("Eliminar sesión", `¿Eliminar «${ses.nombre}»${totalEj ? ` con sus ${totalEj} ejercicios (en todas las semanas)` : ""}?`, { si: "Eliminar", peligro: true })) { hoja.cerrar(); acciones.eliminar && acciones.eliminar(); }
       });
     }
   };

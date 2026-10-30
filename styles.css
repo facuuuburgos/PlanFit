@@ -753,7 +753,7 @@ button.icono.chev { color: var(--txt2); }
 /* ============ modo ENTRENAR: pantalla a pantalla completa, sin distracciones ============ */
 .modo-entrenar .lateral, .modo-entrenar .tabbar, .modo-entrenar .barra-sup, .modo-entrenar .btn-lateral { display: none !important; }
 .modo-entrenar .principal { height: 100%; }
-.contenido.entrenar { max-width: 640px; padding: 0; margin: 0 auto; }
+.contenido.entrenar { max-width: none; width: 100%; padding: 0; margin: 0; }
 
 .ent-pantalla { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; background: var(--bg); position: relative; }
 
@@ -764,7 +764,7 @@ button.icono.chev { color: var(--txt2); }
 .ent-top-t span { font-size: 12px; color: var(--txt2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ent-top-n { flex: none; font-size: 13px; font-weight: 700; color: var(--txt2); font-variant-numeric: tabular-nums; padding-right: 6px; }
 
-.ent-dots { display: flex; gap: 6px; padding: 2px 16px 10px; overflow-x: auto; scrollbar-width: none; }
+.ent-dots { display: flex; gap: 6px; padding: 2px 16px 10px; overflow-x: auto; scrollbar-width: none; justify-content: center; }
 .ent-dots::-webkit-scrollbar { display: none; }
 .ent-dots button { flex: none; width: 10px; height: 10px; border-radius: 99px; border: 0; background: var(--relleno2); padding: 0; transition: transform .25s var(--resorte), background .2s; }
 .ent-dots button.on { background: var(--acento); transform: scale(1.3); }
@@ -844,7 +844,6 @@ button.icono.chev { color: var(--txt2); }
 @keyframes conf-caer { from { transform: translate(0, -5vh) rotate(0deg); opacity: 1; } to { transform: translate(var(--drift), 108vh) rotate(var(--rot)); opacity: .9; } }
 
 @media (min-width: 900px) {
-  .ent-pantalla { max-width: 640px; margin: 0 auto; }
   .contenido.entrenar { padding-bottom: 0; }
 }
 @media (prefers-reduced-motion: reduce) { .ent-card, .ent-dots button, .ent-reloj-centro, .ent-fin-card { animation: none !important; transition: none !important; } .conf-pieza { animation-duration: .01s !important; } .prog.pulso { animation: none !important; } }

@@ -451,10 +451,10 @@
     }
 
     function filaEjercicio(p, cols, e, idx, w, y, zebra, color) {
-      const celda = e.sem[w - 1] || PF.semanaVacia();
+      const celda = e;
       const cEj = cols[1];
       const nota = [e.tempo ? `Tempo ${e.tempo}` : "", opciones.notas ? e.nota : ""].filter(Boolean).join("  ·  ");
-      const hNom = p.alturaBloque(PF.nombreEn(e, w) || "Ejercicio", cEj.w - 10, 10, "b", 12.5);
+      const hNom = p.alturaBloque(e.nombre || "Ejercicio", cEj.w - 10, 10, "b", 12.5);
       const hNota = nota ? p.alturaBloque(nota, cEj.w - 10, 8, "r", 10.5) + 1 : 0;
       const h = Math.max(NV.fila, hNom + hNota + NV.pad);
 
@@ -471,7 +471,7 @@
         }
 
         const top = yy + (h - hNom - hNota) / 2;
-        p.bloque(PF.nombreEn(e, w) || "Ejercicio", cEj.x, top, cEj.w - 10, { size: 10, color: TINTA, lh: 12.5 });
+        p.bloque(e.nombre || "Ejercicio", cEj.x, top, cEj.w - 10, { size: 10, color: TINTA, lh: 12.5 });
         if (nota) p.bloque(nota, cEj.x, top + hNom + 1, cEj.w - 10, { size: 8, color: GRIS, lh: 10.5 });
 
         const cy = yy + h / 2 - 6;
@@ -482,7 +482,7 @@
           else if (col.id === "r") cen(col, String(celda.r ?? ""));
           else if (col.id === "d") cen(col, fmtDesc(celda.d), { size: 10.5 });
           else if (col.id === "i") {
-            const pc = fmtPct(celda), kg = opciones.kg ? PF.kgDe(e, w) : null;
+            const pc = fmtPct(celda), kg = opciones.kg ? PF.kgDe(e) : null;
             if (pc && kg) { cen(col, pc, { y: yy + h / 2 - 11 }); cen(col, `${String(kg).replace(".", ",")} kg`, { y: yy + h / 2 + 2, size: 8, color: GRIS }); }
             else if (pc) cen(col, pc);
             else cen(col, "–", { color: "#C8C4BA" });
@@ -510,12 +510,12 @@
 
     // Prepara una sesión de una semana: cabecera, filas y alturas (sin dibujar)
     function prepararSesion(sesCompleta, idxSesion, w, color) {
-      const ejs = sesCompleta.ejercicios.filter((e) => PF.activo(e, w));
+      const ejs = sesCompleta.semanas[w - 1].ejercicios;
       if (!ejs.length) return null;
       const ses = Object.assign({}, sesCompleta, { ejercicios: ejs });
       const cols = columnas();
       const p = S.p;
-      const total = ejs.reduce((a, e) => a + (+((e.sem[w - 1] || {}).s) || 0), 0);
+      const total = ejs.reduce((a, e) => a + (+e.s || 0), 0);
       const calTxt = ses.calentamiento ? "Calentamiento: " + ses.calentamiento : "";
       const hCal = calTxt ? p.alturaBloque(calTxt, CW - 150, 8.5, "r", 11.5) : 0;
       const base = ses.foco ? 44 : 31;
@@ -631,22 +631,27 @@
       S.y = y;
 
       plan.sesiones.forEach((ses, si) => {
-        const lista = ses.ejercicios.filter((e) => semanas.some((w) => PF.activo(e, w)));
-        if (!lista.length) return;
+        // cada semana es independiente: se agrupa por nombre de ejercicio (coincidencia de texto)
+        // como mejor aproximación para mostrar la evolución entre semanas.
+        const nombreDe = (e) => e.nombre || "Ejercicio";
+        const nombres = [];
+        const vistos = new Set();
+        semanas.forEach((w) => {
+          for (const e of ses.semanas[w - 1].ejercicios) {
+            const nm = nombreDe(e);
+            if (!vistos.has(nm)) { vistos.add(nm); nombres.push(nm); }
+          }
+        });
+        if (!nombres.length) return;
         const porBloque = 6;
 
         for (let b = 0; b < semanas.length; b += porBloque) {
           const bloque = semanas.slice(b, b + porBloque);
           const nameW = 150, cw = (CW - nameW) / porBloque;
-          const listaB = lista.filter((e) => bloque.some((w) => PF.activo(e, w)));
-          if (!listaB.length) continue;
+          const nombresB = nombres.filter((nm) => bloque.some((w) => ses.semanas[w - 1].ejercicios.some((e) => nombreDe(e) === nm)));
+          if (!nombresB.length) continue;
 
-          // un ejercicio con variantes se reparte en una fila por nombre efectivo
-          const filasB = [];
-          listaB.forEach((e) => {
-            const nombres = [...new Set(bloque.filter((w) => PF.activo(e, w)).map((w) => PF.nombreEn(e, w)))];
-            nombres.forEach((nm) => filasB.push({ e, nm }));
-          });
+          const filasB = nombresB.map((nm) => ({ nm }));
 
           // la tabla se mantiene entera: si no cabe en lo que queda pero sí en una página nueva, pasa a la siguiente
           const altoTabla = 20 + 38 + filasB.reduce((a, f) => a + Math.max(32, S.p.alturaBloque(f.nm || "Ejercicio", nameW - 14, 9, "b", 11.5, 2) + 12), 0);
@@ -679,7 +684,7 @@
 
           yy = cabecera(p, yy);
 
-          filasB.forEach(({ e, nm }, k) => {
+          filasB.forEach(({ nm }, k) => {
             const hNom = p.alturaBloque(nm || "Ejercicio", nameW - 14, 9, "b", 11.5, 2);
             const h = Math.max(32, hNom + 12);
 
@@ -693,12 +698,13 @@
             p.bloque(nm || "Ejercicio", M + 10, yy + (h - hNom) / 2, nameW - 14, { size: 9, font: "b", color: TINTA, lh: 11.5, maxLines: 2 });
 
             bloque.forEach((w, i) => {
-              const c = e.sem[w - 1];
-              if (!c) return;
+              const c = ses.semanas[w - 1].ejercicios.find((e) => nombreDe(e) === nm);
               const x = M + nameW + i * cw + cw / 2;
-              if (!PF.activo(e, w) || PF.nombreEn(e, w) !== nm) { p.text("—", x, yy + h / 2 - 5, { size: 9, color: "#CFCBC2", align: "center" }); return; }
-              const prev = PF.activo(e, w - 1) && PF.nombreEn(e, w - 1) === nm ? e.sem[w - 2] : null;   // si el ejercicio recién aparece, no se marca como cambio
-              const cambio = (campo) => prev && String(prev[campo] ?? "") !== String(c[campo] ?? "") && w !== semanas[0];
+              if (!c) { p.text("—", x, yy + h / 2 - 5, { size: 9, color: "#CFCBC2", align: "center" }); return; }
+              const posGlobal = semanas.indexOf(w);
+              const wPrev = posGlobal > 0 ? semanas[posGlobal - 1] : null;
+              const prev = wPrev ? ses.semanas[wPrev - 1].ejercicios.find((e) => nombreDe(e) === nm) : null;   // si el ejercicio recién aparece, no se marca como cambio
+              const cambio = (campo) => prev && String(prev[campo] ?? "") !== String(c[campo] ?? "");
               const l1 = fmtSR(c);
               const cambia1 = cambio("s") || cambio("r");
               p.text(l1, x, yy + h / 2 - 11, { size: 9.5, font: "b", color: cambia1 ? acento : TINTA, align: "center" });
@@ -848,7 +854,7 @@
 
     portada();
 
-    if (plan.sesiones.some((s) => s.ejercicios.length)) {
+    if (plan.sesiones.some((s) => s.semanas.some((wk) => wk.ejercicios.length))) {
       semanas.forEach((w, i) => paginaSemana(w, alcance === "semana" && i === semanas.length - 1 ? Math.min(datosCierre(true).total, 230) + 12 : 0));
       if (alcance !== "semana") evolucion();
     }

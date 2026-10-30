@@ -230,7 +230,7 @@
       if (b.tipo === "fortime" && !b.timeCap) { cargarFases([{ etiqueta: "FOR TIME", seg: 0, tipo: "trabajo" }], true); return; }
       cargarFases(fasesDeBloque(b), true);
     } else {
-      const c = paso.e.sem[w - 1];
+      const c = paso.e;
       if (c.d > 0) cargarFases([{ etiqueta: "Descanso", seg: c.d, tipo: "descanso" }], false);
       else cargarFases([{ etiqueta: "Temporizador", seg: 0, tipo: "neutro" }], false);
     }
@@ -239,8 +239,8 @@
   /* ---------- tarjetas de cada paso ---------- */
 
   function tarjetaEjercicio(plan, p, w) {
-    const e = p.e, c = e.sem[w - 1];
-    const kg = plan.opciones.kg ? PF.kgDe(e, w) : null;
+    const e = p.e, c = e;
+    const kg = plan.opciones.kg ? PF.kgDe(e) : null;
     const pc = PF.num(c.i);
     const nota = [e.tempo ? "Tempo " + h(e.tempo) : "", e.rm ? "Máx. " + h(e.rm) + " kg" : "", e.nota ? h(e.nota) : ""].filter(Boolean).join(" · ");
     return `
@@ -288,7 +288,7 @@
       pasos = ses.bloques.map((b, bi) => ({ tipo: "bloque", b, bi }));
     } else {
       w = Math.max(1, Math.min(plan.semanas, UI.estado.semanaVista[plan.id] || PF.semanaActual(plan)));
-      pasos = ses.ejercicios.map((e, ei) => ({ tipo: "ej", e, ei })).filter((p) => PF.activo(p.e, w));
+      pasos = ses.semanas[w - 1].ejercicios.map((e, ei) => ({ tipo: "ej", e, ei }));
     }
 
     const clave = plan.id + ":" + si;

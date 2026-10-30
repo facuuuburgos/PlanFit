@@ -63,61 +63,28 @@
 
   PF.semanaVacia = () => ({ s: 3, r: "10", d: 60, i: null, rpe: "" });
 
-  /* ---------- semanas en las que aparece un ejercicio ----------
-     ej.act = lista de true/false (una por semana). Si no existe, el ejercicio aparece en todas las semanas. */
-  PF.activo = (e, w) => !e.act || e.act[w - 1] !== false;
-  PF.semanasActivas = (e, n) => { const l = []; for (let w = 1; w <= n; w++) if (PF.activo(e, w)) l.push(w); return l; };
-  PF.ponerActivas = (e, n, lista) => {
-    const set = new Set(lista);
-    const act = Array.from({ length: n }, (_, i) => set.has(i + 1));
-    if (act.every(Boolean)) delete e.act; else e.act = act;
-  };
-  /* ---------- ejercicios por fase ----------
-     ej.fases = ids de las fases donde aparece (si no existe, aparece en todas). De ahí se calcula ej.act (semanas). */
-  PF.sincEj = (plan, rangos, e) => {
-    if (!Array.isArray(e.fases)) { delete e.fases; delete e.act; return; }
-    const ids = e.fases.filter((id) => rangos.some((r) => r.fase.id === id));
-    if (!ids.length || ids.length === rangos.length) { delete e.fases; delete e.act; return; }
-    e.fases = ids;
-    const act = Array.from({ length: plan.semanas }, (_, i) => { const r = rangos.find((x) => i + 1 >= x.desde && i + 1 <= x.hasta); return !r || ids.includes(r.fase.id); });
-    if (act.every(Boolean)) delete e.act; else e.act = act;
-  };
-  PF.sincronizarFases = (plan) => { if (plan.tipo === "funcional") return; const rg = PF.rangosFases(plan); for (const s of plan.sesiones) for (const e of s.ejercicios) PF.sincEj(plan, rg, e); };
-  PF.ponerActivo = (e, n, w, valor) => { const l = PF.semanasActivas(e, n).filter((x) => x !== w); if (valor) l.push(w); PF.ponerActivas(e, n, l); };
-  /* ---------- variantes: otro nombre para el mismo ejercicio en ciertas semanas ----------
-     ej.vars = lista (una por semana) con el nombre de la variante, o "" si esa semana usa el ejercicio original. */
-  const normN = (s) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
-  PF.nombreEn = (e, w) => (e.vars && e.vars[w - 1]) || e.nombre;
-  PF.esVariante = (e, w) => !!(e.vars && e.vars[w - 1]);
-  // nombres distintos que usa el ejercicio (el original primero)
-  PF.nombresDe = (e, n, soloActivas = true) => {
-    const out = [e.nombre];
-    for (let w = 1; w <= n; w++) { if (soloActivas && !PF.activo(e, w)) continue; const x = PF.nombreEn(e, w); if (!out.includes(x)) out.push(x); }
-    return out;
-  };
-  PF.ponerVariante = (e, n, semanas, nombre) => {
-    const nuevo = normN(nombre) === normN(e.nombre) ? "" : String(nombre || "").trim();
-    const v = Array.from({ length: n }, (_, i) => (e.vars && e.vars[i]) || "");
-    for (const w of semanas) v[w - 1] = nuevo;
-    if (v.every((x) => !x)) delete e.vars; else e.vars = v;
-  };
-
-  // [1,2,3,4,9] -> "1–4, 9"
-  PF.textoSemanas = (lista) => {
-    const l = [...lista].sort((a, b) => a - b), out = [];
-    for (let i = 0; i < l.length;) { let j = i; while (j + 1 < l.length && l[j + 1] === l[j] + 1) j++; out.push(j > i ? `${l[i]}–${l[j]}` : `${l[i]}`); i = j + 1; }
-    return out.join(", ");
-  };
-
-  PF.nuevoEjercicio = (nombre = "", semanas = 1, base = null) => {
-    const ej = { id: PF.id(), nombre, grupo: "", nota: "", tempo: "", rm: null, super: "", sem: [] };
-    for (let i = 0; i < semanas; i++) ej.sem.push(base ? { ...base } : PF.semanaVacia());
-    return ej;
+  /* ---------- ejercicio de una semana ----------
+     cada ejercicio vive dentro de una sola semana (session.semanas[w-1].ejercicios) y es totalmente
+     independiente del mismo ejercicio en otra semana: nombre, series, repeticiones, carga, descanso, etc. */
+  PF.nuevoEjercicio = (nombre = "", base = null) => {
+    const def = PF.semanaVacia();
+    return {
+      id: PF.id(), nombre,
+      grupo: (base && base.grupo) || "", nota: (base && base.nota) || "", tempo: (base && base.tempo) || "",
+      rm: base && base.rm != null ? base.rm : null, super: (base && base.super) || "",
+      s: base && base.s !== undefined ? base.s : def.s,
+      r: base && base.r !== undefined ? base.r : def.r,
+      d: base && base.d !== undefined ? base.d : def.d,
+      i: base && base.i !== undefined ? base.i : def.i,
+      rpe: base && base.rpe !== undefined ? base.rpe : def.rpe,
+    };
   };
 
   PF.nuevaSesion = (nombre = "", semanas = 1) => ({
-    id: PF.id(), nombre, dia: "", foco: "", calentamiento: "", ejercicios: [],
+    id: PF.id(), nombre, dia: "", foco: "", calentamiento: "",
+    semanas: Array.from({ length: Math.max(1, Math.round(+semanas || 1)) }, () => ({ ejercicios: [] })),
   });
+
 
   PF.nuevoPlan = (clienteId, plantillaId = "libre") => {
     const pl = D.PLANTILLAS_PLAN.find((p) => p.id === plantillaId) || D.PLANTILLAS_PLAN[D.PLANTILLAS_PLAN.length - 1];
@@ -239,14 +206,54 @@
     plan.semInfo.length = plan.semanas;
 
     for (const s of plan.sesiones) {
-      for (const e of s.ejercicios) {
-        while (e.sem.length < plan.semanas) e.sem.push({ ...(e.sem[e.sem.length - 1] || PF.semanaVacia()) });
-        e.sem.length = plan.semanas;
-        delete e.vars;
+      // migración desde el modelo viejo: un solo s.ejercicios compartido por todas las semanas,
+      // con los valores de cada semana en e.sem[w-1]. Se convierte en semanas totalmente independientes
+      // (cada semana ya cargada conserva exactamente sus valores; no se inventa contenido nuevo).
+      if (!Array.isArray(s.semanas)) {
+        const viejos = Array.isArray(s.ejercicios) ? s.ejercicios : [];
+        const nuevasSemanas = [];
+        for (let w = 1; w <= plan.semanas; w++) {
+          const ejs = [];
+          for (const e of viejos) {
+            if (e.act && e.act[w - 1] === false) continue;
+            const c = (e.sem && e.sem[w - 1]) || PF.semanaVacia();
+            const nombre = (e.vars && e.vars[w - 1]) || e.nombre || "";
+            ejs.push({
+              id: PF.id(), nombre, grupo: e.grupo || "", nota: e.nota || "", tempo: e.tempo || "",
+              rm: e.rm ?? null, super: e.super || "",
+              s: c.s ?? 3, r: c.r ?? "10", d: c.d ?? 60, i: c.i ?? null, rpe: c.rpe ?? "",
+            });
+          }
+          nuevasSemanas.push({ ejercicios: ejs });
+        }
+        s.semanas = nuevasSemanas;
+        delete s.ejercicios;
+      }
+
+      // una semana nueva (plan.semanas creció) empieza vacía: no se copia nada de otra semana
+      while (s.semanas.length < plan.semanas) s.semanas.push({ ejercicios: [] });
+      s.semanas.length = plan.semanas;
+
+      for (const wk of s.semanas) {
+        if (!Array.isArray(wk.ejercicios)) wk.ejercicios = [];
+        for (const e of wk.ejercicios) {
+          if (e.id == null) e.id = PF.id();
+          if (e.nombre === undefined) e.nombre = "";
+          if (e.grupo === undefined) e.grupo = "";
+          if (e.nota === undefined) e.nota = "";
+          if (e.tempo === undefined) e.tempo = "";
+          if (e.rm === undefined) e.rm = null;
+          if (e.super === undefined) e.super = "";
+          if (e.s === undefined) e.s = 3;
+          if (e.r === undefined) e.r = "10";
+          if (e.d === undefined) e.d = 60;
+          if (e.i === undefined) e.i = null;
+          if (e.rpe === undefined) e.rpe = "";
+          delete e.act; delete e.fases; delete e.vars; delete e.sem;
+        }
       }
     }
 
-    PF.sincronizarFases(plan);
     return plan;
   };
 
@@ -295,8 +302,8 @@
 
   /* ---------- cálculos ---------- */
 
-  PF.kgDe = (ej, w) => {
-    const rm = PF.num(ej.rm), i = PF.num(ej.sem[w - 1] && ej.sem[w - 1].i);
+  PF.kgDe = (ej) => {
+    const rm = PF.num(ej.rm), i = PF.num(ej.i);
     if (!rm || !i) return null;
     const kg = (rm * i) / 100;
     return Math.round(kg / 2.5) * 2.5;
@@ -304,14 +311,14 @@
 
   PF.resumenSemana = (plan, w) => {
     let series = 0, sumaInt = 0, nInt = 0, ejercicios = 0;
+    const wk = (w >= 1 && w <= plan.semanas) ? w : null;
 
     for (const s of plan.sesiones) {
-      for (const e of s.ejercicios) {
-        const c = e.sem[w - 1];
-        if (!c || !PF.activo(e, w)) continue;
+      const lista = wk ? (s.semanas[wk - 1] || { ejercicios: [] }).ejercicios : [];
+      for (const e of lista) {
         ejercicios++;
-        series += Math.max(0, +c.s || 0);
-        const i = PF.num(c.i);
+        series += Math.max(0, +e.s || 0);
+        const i = PF.num(e.i);
         if (i) { sumaInt += i; nInt++; }
       }
     }
@@ -325,58 +332,38 @@
     return c;
   };
 
-  /* ---------- herramientas de progresión ---------- */
+  /* ---------- copiar / vaciar / descarga de semanas (cada semana es independiente) ---------- */
 
-  const sumarValor = (valor, delta) => {
-    // admite "10", "8-10", "12" ...
-    const s = String(valor ?? "").trim();
-    const rango = s.match(/^(\d+(?:[.,]\d+)?)\s*[-–]\s*(\d+(?:[.,]\d+)?)$/);
-    const f = (n) => { const x = Math.max(0, Math.round((n + delta) * 100) / 100); return String(x).replace(".", ","); };
-    if (rango) return `${f(parseFloat(rango[1].replace(",", ".")))}-${f(parseFloat(rango[2].replace(",", ".")))}`;
-    const n = PF.num(s);
-    return n === null ? s : f(n);
-  };
-
-  // Aplica una progresión lineal a un campo desde la semana `desde` hasta `hasta` (1-based).
-  PF.progresion = (ej, campo, desde, hasta, inicio, paso) => {
-    for (let w = desde; w <= hasta && w <= ej.sem.length; w++) {
-      const k = (w - desde) * paso;
-      const c = ej.sem[w - 1];
-      if (!PF.activo(ej, w)) continue;
-
-      if (campo === "r") c.r = sumarValor(inicio, k);
-      else if (campo === "rpe") c.rpe = sumarValor(inicio, k);
-      else {
-        const base = PF.num(inicio) ?? 0;
-        let v = base + k;
-        if (campo === "i") v = Math.max(0, Math.min(150, Math.round(v * 10) / 10));
-        else if (campo === "s") v = Math.max(0, Math.round(v));
-        else if (campo === "d") v = Math.max(0, Math.round(v / 5) * 5);
-        c[campo] = v;
-      }
-    }
-  };
-
+  // Reemplaza por completo el contenido de la semana `a` con una copia (con ids nuevos) de la semana `de`.
+  // La semana de origen no se toca.
   PF.copiarSemana = (plan, de, a) => {
-    for (const s of plan.sesiones) for (const e of s.ejercicios) {
-      const act = PF.activo(e, de);
-      PF.ponerActivo(e, plan.semanas, a, act);
-      if (act) e.sem[a - 1] = { ...e.sem[de - 1] };
+    for (const s of plan.sesiones) {
+      const origen = (s.semanas[de - 1] || { ejercicios: [] }).ejercicios;
+      s.semanas[a - 1] = { ejercicios: origen.map((e) => ({ ...e, id: PF.id() })) };
     }
     plan.semInfo[a - 1] = { ...plan.semInfo[de - 1] };
   };
 
+  // Vacía el contenido de una semana específica. Las demás semanas no se modifican.
+  PF.vaciarSemana = (plan, w) => {
+    for (const s of plan.sesiones) s.semanas[w - 1] = { ejercicios: [] };
+    plan.semInfo[w - 1] = { nota: "", descarga: false };
+  };
+
+  // Marca una semana como descarga: si está vacía, trae una copia de la semana anterior y la reduce;
+  // si ya tiene contenido propio, reduce sus propios valores (no toca otras semanas).
   PF.aplicarDescarga = (plan, w, factorSeries = 0.6, factorInt = 0.85) => {
     for (const s of plan.sesiones) {
-      for (const e of s.ejercicios) {
-        if (!PF.activo(e, w)) continue;
-        const prev = (w > 1 && PF.activo(e, w - 1)) ? e.sem[w - 2] : e.sem[w - 1];
-        const c = e.sem[w - 1];
-        c.s = Math.max(1, Math.round((+prev.s || 1) * factorSeries));
-        c.r = prev.r;
-        c.d = prev.d;
-        const i = PF.num(prev.i);
-        c.i = i ? Math.round(i * factorInt) : prev.i;
+      let lista = (s.semanas[w - 1] || { ejercicios: [] }).ejercicios;
+      if (!lista.length && w > 1) {
+        const prevLista = (s.semanas[w - 2] || { ejercicios: [] }).ejercicios;
+        lista = prevLista.map((e) => ({ ...e, id: PF.id() }));
+        s.semanas[w - 1] = { ejercicios: lista };
+      }
+      for (const e of lista) {
+        e.s = Math.max(1, Math.round((+e.s || 1) * factorSeries));
+        const i = PF.num(e.i);
+        if (i) e.i = Math.round(i * factorInt);
       }
     }
     plan.semInfo[w - 1].descarga = true;
@@ -391,7 +378,11 @@
     copia.semanaManual = null;
     copia.inicio = PF.hoyISO();
     for (const f of copia.fases) f.id = PF.id();
-    for (const s of copia.sesiones) { s.id = PF.id(); for (const e of (s.ejercicios || [])) e.id = PF.id(); for (const b of (s.bloques || [])) { b.id = PF.id(); for (const e of b.ejercicios) e.id = PF.id(); } }
+    for (const s of copia.sesiones) {
+      s.id = PF.id();
+      for (const wk of (s.semanas || [])) for (const e of (wk.ejercicios || [])) e.id = PF.id();
+      for (const b of (s.bloques || [])) { b.id = PF.id(); for (const e of b.ejercicios) e.id = PF.id(); }
+    }
     return copia;
   };
 

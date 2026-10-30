@@ -3,7 +3,7 @@
   "use strict";
 
   const UI = root.UI, PF = root.PF, D = root.PF_DATA, Store = PF.Store, h = UI.h, $ = UI.$, $$ = UI.$$;
-  UI.VERSION = "1.13.0";
+  UI.VERSION = "1.14.0";
   UI.lateralOculto = () => { try { return localStorage.getItem("planfit.lateralOculto") === "1"; } catch (e) { return false; } };
 
   const ancho = () => matchMedia("(min-width: 900px)").matches;
@@ -306,32 +306,25 @@
       UI.editarSesion(p, null, (s) => { PF.normalizarPlan(p); p.sesiones.push(s); UI.tocarPlan(p); UI.render(true); });
     },
 
-    async "copiar-semana"() {
+    "copiar-semana"() {
       const p = planActual(), w = Math.max(1, Math.min(p.semanas, UI.estado.semanaVista[p.id] || PF.semanaActual(p)));
-      if (w <= 1) return;
-      if (await UI.confirmar("Copiar semana anterior", `Se reemplazarán los valores de la semana ${w} por los de la semana ${w - 1}.`, { si: "Copiar" })) {
-        PF.copiarSemana(p, w - 1, w); UI.tocarPlan(p); UI.render(true); UI.aviso(`Semana ${w - 1} copiada a la ${w}`);
-      }
-    },
-
-    traerFase() {
-      const p = planActual(), w = Math.max(1, Math.min(p.semanas, UI.estado.semanaVista[p.id] || PF.semanaActual(p)));
-      const rg = PF.rangosFases(p), aqui = PF.faseDeSemana(p, w);
-      if (!aqui) return;
-      const todos = p.sesiones.flatMap((s) => s.ejercicios);
-      const enFase = (e, r) => !Array.isArray(e.fases) || e.fases.includes(r.fase.id);
-      const otras = rg.filter((r) => r.fase.id !== aqui.fase.id);
+      if (p.semanas <= 1) return;
+      const opciones = Array.from({ length: p.semanas }, (_, i) => i + 1).filter((x) => x !== w);
       const hoja = UI.hoja({
-        titulo: "Traer ejercicios de otra fase",
-        html: `<p>Los ejercicios de la otra fase se suman a «${h(aqui.fase.nombre)}», con sus series y repeticiones. Los que ya estén aquí no se duplican.</p>
-          ${otras.map((r) => { const t = todos.filter((e) => enFase(e, r) && !enFase(e, aqui)).length; return `<button class="fila" data-fid="${r.fase.id}" ${t ? "" : "disabled"} style="box-shadow:none"><span class="t"><b>${h(r.fase.nombre)}</b><span>${t ? t + (t === 1 ? " ejercicio" : " ejercicios") + " para traer" : "Nada nuevo para traer"}</span></span></button>`; }).join("")}`,
+        titulo: "Copiar semana", clase: "dialogo",
+        html: `<p>Elige de qué semana copiar los ejercicios, series, repeticiones, cargas y descansos hacia la semana ${w}. Se reemplazará todo el contenido actual de la semana ${w}; las demás semanas no se tocan.</p>
+          <div class="lista-fases" id="cs-lista">${opciones.map((x) => {
+            const info = PF.faseDeSemana(p, x);
+            return `<button class="fila-fase" data-w="${x}"><i style="background:${info ? info.fase.color : "#8A93A6"}"></i><span><b>Semana ${x}</b>${info ? `<small>${h(info.fase.nombre)}</small>` : ""}</span></button>`;
+          }).join("")}</div>`,
       });
-      hoja.el.addEventListener("click", (ev) => {
-        const b = ev.target.closest("[data-fid]"); if (!b || b.disabled) return;
-        const r = rg.find((x) => x.fase.id === b.dataset.fid);
-        let n = 0;
-        todos.forEach((e) => { if (enFase(e, r) && !enFase(e, aqui)) { e.fases = [...e.fases, aqui.fase.id]; n++; } });
-        UI.tocarPlan(p); hoja.cerrar(); UI.render(true); UI.aviso(n + (n === 1 ? " ejercicio traído" : " ejercicios traídos"));
+      hoja.el.addEventListener("click", async (ev) => {
+        const b = ev.target.closest("[data-w]"); if (!b) return;
+        const de = +b.dataset.w;
+        hoja.cerrar();
+        if (await UI.confirmar("Copiar semana", `Se reemplazarán los valores de la semana ${w} por los de la semana ${de}.`, { si: "Copiar" })) {
+          PF.copiarSemana(p, de, w); UI.tocarPlan(p); UI.render(true); UI.aviso(`Semana ${de} copiada a la ${w}`);
+        }
       });
     },
 
@@ -339,11 +332,19 @@
       const p = planActual(), w = Math.max(1, Math.min(p.semanas, UI.estado.semanaVista[p.id] || PF.semanaActual(p)));
       const info = p.semInfo[w - 1];
       if (info.descarga) { info.descarga = false; UI.tocarPlan(p); UI.render(true); return; }
-      if (w > 1 && p.sesiones.some((s) => s.ejercicios.length) &&
+      const hayAnterior = w > 1 && p.sesiones.some((s) => s.semanas[w - 2].ejercicios.length);
+      if (hayAnterior &&
         await UI.confirmar("Semana de descarga", "¿Reducir automáticamente el volumen (≈ 60 % de las series) y la intensidad (≈ 85 %) respecto a la semana anterior?", { si: "Sí, reducir", no: "Solo marcar" })) {
         PF.aplicarDescarga(p, w);
       } else info.descarga = true;
       UI.tocarPlan(p); UI.render(true);
+    },
+
+    async "vaciar-semana"() {
+      const p = planActual(), w = Math.max(1, Math.min(p.semanas, UI.estado.semanaVista[p.id] || PF.semanaActual(p)));
+      if (await UI.confirmar("Vaciar semana", `Se eliminará todo el contenido de la semana ${w} (ejercicios y valores). Las demás semanas no se modifican.`, { si: "Vaciar", peligro: true })) {
+        PF.vaciarSemana(p, w); UI.tocarPlan(p); UI.render(true); UI.aviso(`Semana ${w} vaciada`);
+      }
     },
 
     async compartir() {
